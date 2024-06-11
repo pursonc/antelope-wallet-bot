@@ -1,78 +1,19 @@
 import { APIClient, PrivateKey } from "@wharfkit/antelope";
-import fetch from "node-fetch";
 import crypto from "crypto";
 import { runQuery, getQuery } from "./db";
 import TelegramBot from "node-telegram-bot-api";
+import { sendWalletOptions, selectFastestEndpoint } from "./utils";
 
-// Helper function to send wallet options
-function sendWalletOptions(bot: TelegramBot, chatId: number, message: string) {
-  bot.sendMessage(chatId, message, {
-    reply_markup: {
-      inline_keyboard: [
-        [{ text: "🐵 Profile", callback_data: "profile" }],
-        [{ text: "💳 Wallets", callback_data: "wallets" }],
-        [{ text: "📦 Transfer EOS", callback_data: "transfer_eos" }],
-      ],
-    },
-  });
-}
 
-// List of API endpoints
-const apiEndpoints = [
-  "https://eos.greymass.com",
-  "https://api.main.alohaeos.com",
-  "https://eospush.mytokenpocket.vip",
-  "https://eospush.tokenpocket.pro",
-];
 
-// Function to measure response time
-async function measureResponseTime(url: string): Promise<number> {
-    const start = Date.now();
-    try {
-        const response = await fetch(`${url}/v1/chain/get_info`);
-        if (!response.ok) {
-            throw new Error('Network response was not ok');
-        }
-        await response.json();
-        return Date.now() - start;
-    } catch (error) {
-        return Number.MAX_SAFE_INTEGER; // Return a high value on error
-    }
-}
-
-// Function to select the fastest API endpoint
-async function selectFastestEndpoint(): Promise<string> {
-    try {
-        const responseTimes = await Promise.all(apiEndpoints.map(url => measureResponseTime(url)));
-        const fastestIndex = responseTimes.indexOf(Math.min(...responseTimes));
-        return apiEndpoints[fastestIndex];
-    } catch (error) {
-        console.error("Error selecting fastest endpoint:", error);
-        return apiEndpoints[0]; // Default to the first endpoint in case of an error
-    }
-}
 
 // Ensure the createClient function uses node-fetch
 async function createClient() {
   const fastestEndpoint = await selectFastestEndpoint();
-  const fetch = (await import("node-fetch")).default;
-  return new APIClient({
+    const client = new APIClient({
     url: fastestEndpoint,
-    fetch: async (url, options) => {
-      const { method, headers, body } = options;
-      const response = await fetch(url, {
-        method,
-        headers,
-        body,
-      });
-      return {
-        status: response.status,
-        statusText: response.statusText,
-        json: async () => response.json(),
-        text: async () => response.text(),
-      };
-    },
-  });
+    });
+    return client;
 }
 
 const clientPromise = createClient();
@@ -155,12 +96,7 @@ export async function createEosAccount(
   }
 }
 
-export async function importEosAccount(
-  bot: TelegramBot,
-  chatId: number,
-  userId: number,
-  eosPrivateKey: string
-) {
+export async function importEosAccount(eosPrivateKey: string, userId: number) {
   try {
     const privateKey = PrivateKey.from(eosPrivateKey);
     const publicKey = privateKey.toPublic().toString();
@@ -176,25 +112,19 @@ export async function importEosAccount(
       throw new Error("No account found for this private key.");
     }
 
-    const eosAccountName = response.accounts[0].account_name;
+    const accounts = response.accounts.map((account) => ({
+      accountName: account.account_name,
+      permissionName: account.permission_name,
+    }));
 
-    await runQuery(
-      "UPDATE users SET eos_account_name = ?, eos_public_key = ?, eos_private_key = ? WHERE user_id = ?",
-      [eosAccountName, publicKey, encryptedPrivateKey, userId]
-    );
-
-    bot.sendMessage(
-      chatId,
-      `Account imported successfully.\n\n🔹 EOS Account Name: ${eosAccountName}\n🔹 EOS Public Key: ${publicKey}`
-    );
-  } catch (error) {
-  console.error("Error importing EOS account:", error);
+    return { publicKey, encryptedPrivateKey, accounts };
+  } catch (error: unknown) {
     let errorMessage = "Unknown error";
     if (error instanceof Error) {
       errorMessage = error.message;
     }
-    bot.sendMessage(chatId, `Error importing EOS account: ${errorMessage}`);
-    sendWalletOptions(bot, chatId, "Returning to wallet options...");
+   throw new Error("Error importing EOS account: ${errorMessage}");
+
   }
 }
 

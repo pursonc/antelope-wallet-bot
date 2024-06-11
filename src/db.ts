@@ -19,7 +19,8 @@ db.run(
         last_name TEXT,
         eos_account_name TEXT,
         eos_public_key TEXT,
-        eos_private_key TEXT
+        eos_private_key TEXT,
+        permission_name TEXT
     )
 `,
   (err) => {
