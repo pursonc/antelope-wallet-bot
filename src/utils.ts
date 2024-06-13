@@ -77,9 +77,9 @@ export async function getEosPrice(): Promise<number> {
   }
 
   const urls = [
-    "https://api.binance.com/api/v3/ticker/price?symbol=EOSUSDT",
     "https://api.kraken.com/0/public/Ticker?pair=EOSUSDT",
     "https://api.coinbase.com/v2/prices/EOS-USD/spot",
+    "https://api.binance.com/api/v3/ticker/price?symbol=EOSUSDT",
   ];
 
   const data = await fetchWithRetry(urls);
