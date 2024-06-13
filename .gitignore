@@ -18,3 +18,5 @@ build/
 
 # Mac system files
 .DS_Store
+
+user_data.db

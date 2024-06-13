@@ -40,17 +40,60 @@ export async function selectFastestEndpoint(): Promise<string> {
     }
 }
 
+async function fetchWithRetry(
+  urls: string[],
+  options: any = {},
+  retries: number = 3,
+  backoff: number = 3000
+): Promise<any> {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    for (const url of urls) {
+      try {
+        const response = await fetch(url, options);
+        if (!response.ok) {
+          throw new Error(
+            `Network response was not ok: ${response.statusText}`
+          );
+        }
+        return await response.json();
+      } catch (error) {
+        console.warn(`Attempt ${attempt} failed for ${url}.`);
+      }
+    }
+    if (attempt < retries) {
+      console.warn(`Retrying in ${backoff}ms...`);
+      await new Promise((resolve) => setTimeout(resolve, backoff));
+    } else {
+      console.error(`All ${retries} attempts failed.`);
+      throw new Error("Failed to fetch data from all URLs.");
+    }
+  }
+}
+
 export async function getEosPrice(): Promise<number> {
   const now = Date.now();
   if (eosPriceCache && now - eosPriceCache.timestamp < 60000) {
     return eosPriceCache.price;
   }
 
-  const response = await fetch(
-    "https://api.binance.com/api/v3/ticker/price?symbol=EOSUSDT"
-  );
-  const data = (await response.json()) as { symbol: string; price: string };
-  const price = parseFloat(data.price);
+  const urls = [
+    "https://api.binance.com/api/v3/ticker/price?symbol=EOSUSDT",
+    "https://api.kraken.com/0/public/Ticker?pair=EOSUSDT",
+    "https://api.coinbase.com/v2/prices/EOS-USD/spot",
+  ];
+
+  const data = await fetchWithRetry(urls);
+  let price: number;
+
+  if (data.price) {
+    price = parseFloat(data.price);
+  } else if (data.result?.XXBTZEUR?.c?.[0]) {
+    price = parseFloat(data.result.XXBTZEUR.c[0]);
+  } else if (data.data?.amount) {
+    price = parseFloat(data.data.amount);
+  } else {
+    throw new Error("Failed to parse EOS price.");
+  }
 
   eosPriceCache = { price, timestamp: now };
   return price;
