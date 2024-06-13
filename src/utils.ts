@@ -181,7 +181,7 @@ export async function getEosBalance(accountName: string): Promise<string> {
   );
   const data = await response.json();
   if (!data || !data.length) {
-    throw new Error("No balance data found.");
+    return '0';
   }
   return data[0];
 }

@@ -86,7 +86,12 @@ bot.on("callback_query", async (callbackQuery: CallbackQuery) => {
 
       bot.sendMessage(
         chatId!,
-        `Account imported successfully.\n\n🔹 Account Name: ${accountName}\n🔹 Public Key: ${eos_public_key}\n🔹 Permission: ${permissionName}`
+        `Account imported successfully.\n\n🔹 Account Name: ${accountName}\n🔹 Public Key: ${eos_public_key}\n🔹 Permission: ${permissionName}`,
+        {
+          reply_markup: {
+            inline_keyboard: START_MENU,
+          },
+        }
       );
     } catch (error: unknown) {
       let errorMessage = "Unknown error";
@@ -295,10 +300,18 @@ bot.on("callback_query", async (callbackQuery: CallbackQuery) => {
           );
           if (accountExists) {
             await runQuery(
-              "UPDATE users SET eos_account_name = ?, eos_public_key = ?, eos_private_key = ? WHERE user_id = ?",
-              [eos_account_name, eos_public_key, eos_private_key, userId]
+              "UPDATE users SET eos_account_name = ?, eos_public_key = ?, eos_private_key = ?, permission_name = ? WHERE user_id = ?",
+              [
+                eos_account_name,
+                eos_public_key,
+                eos_private_key,
+                "active",
+                userId,
+              ]
             );
-            await runQuery("DELETE FROM orders WHERE user_id = ?", [userId]);
+            await runQuery("DELETE FROM account_orders WHERE user_id = ?", [
+              userId,
+            ]);
 
             bot.sendMessage(
               chatId!,
@@ -532,7 +545,7 @@ bot.on("callback_query", async (callbackQuery: CallbackQuery) => {
               Number(amount),
               memo
             );
-            const transactionId = result.transaction_id;
+            const transactionId = result.resolved?.transaction.id;
             const transactionLink = `https://bloks.io/transaction/${transactionId}`;
             bot.sendMessage(
               chatId,
@@ -551,6 +564,16 @@ bot.on("callback_query", async (callbackQuery: CallbackQuery) => {
           } catch (error: unknown) {
             let errorMessage = "Unknown error";
             if (error instanceof Error) {
+              if (
+                error.message.toLowerCase().includes("cpu") ||
+                error.message.toLowerCase().includes("net")
+              ) {
+                 const user = await getQuery(
+                   "SELECT eos_account_name, eos_public_key, eos_private_key FROM users WHERE user_id = ?",
+                   [userId]
+                 );
+                error.message += `\n\nYour account resources are insufficient. Please visit [this website](https://eospowerup.io/free) and enter your account ${user.eos_account_name} to get free resources, or add [this Telegram bot](https://t.me/eospowerupbot) to get assistance.`;
+              }
               errorMessage = error.message;
             }
             bot.sendMessage(chatId, `Error transferring EOS: ${errorMessage}`, {
@@ -559,6 +582,7 @@ bot.on("callback_query", async (callbackQuery: CallbackQuery) => {
                   [{ text: "↔️ Wallet", callback_data: "wallets" }],
                 ],
               },
+              parse_mode: "Markdown",
             });
           }
         });
@@ -593,7 +617,7 @@ bot.on("callback_query", async (callbackQuery: CallbackQuery) => {
               const result = await buyRamBytes(userId, recipient, bytes);
               bot.sendMessage(
                 chatId,
-                `RAM bought successfully!\nTransaction ID: https://bloks.io/transaction/${result.transaction_id}`,
+                `RAM bought successfully!\nTransaction ID: https://bloks.io/transaction/${result.resolved?.transaction.id}`,
                 {
                   reply_markup: {
                     inline_keyboard: [
@@ -607,7 +631,7 @@ bot.on("callback_query", async (callbackQuery: CallbackQuery) => {
               const result = await buyRam(userId, recipient, eosAmount);
               bot.sendMessage(
                 chatId,
-                `RAM bought successfully!\nTransaction ID: https://bloks.io/transaction/${result.transaction_id}`,
+                `RAM bought successfully!\nTransaction ID: https://bloks.io/transaction/${result.resolved?.transaction.id}`,
                 {
                   reply_markup: {
                     inline_keyboard: [
@@ -625,6 +649,12 @@ bot.on("callback_query", async (callbackQuery: CallbackQuery) => {
           } catch (error: unknown) {
             let errorMessage = "Unknown error";
             if (error instanceof Error) {
+              if (
+                error.message.toLowerCase().includes("cpu") ||
+                error.message.toLowerCase().includes("net")
+              ) {
+                error.message += `\n\nYour account resources are insufficient. Please visit [this website](https://eospowerup.io/free) and enter your account ${user.eos_account_name} to get free resources, or add [this Telegram bot](https://t.me/eospowerupbot) to get assistance.`;
+              }
               errorMessage = error.message;
             }
             bot.sendMessage(chatId, `Error buying RAM: ${errorMessage}`, {
@@ -665,7 +695,13 @@ bot.on("callback_query", async (callbackQuery: CallbackQuery) => {
         break;
 
       default:
-        bot.sendMessage(chatId!, "Unknown command.");
+        if (
+          callbackQuery.data &&
+          !callbackQuery.data.startsWith("select_account:")
+        ) {
+          bot.sendMessage(chatId!, "Unknown command" + callbackQuery.data);
+        }
+
         break;
     }
   } catch (error) {

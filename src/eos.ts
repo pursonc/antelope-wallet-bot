@@ -178,6 +178,9 @@ export async function transferEos(
   ];
 
   const result = await session.transact({ actions }, { broadcast: true });
+
+  
+  
   return result;
 }
 
