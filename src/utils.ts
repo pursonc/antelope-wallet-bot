@@ -85,11 +85,11 @@ export async function getEosPrice(): Promise<number> {
   const data = await fetchWithRetry(urls);
   let price: number;
 
-  if (data.price) {
+  if (data?.price) {
     price = parseFloat(data.price);
-  } else if (data.result?.EOSUSDT?.c?.[0]) {
+  } else if (data?.result?.EOSUSDT?.c?.[0]) {
     price = parseFloat(data.result.EOSUSDT.c[0]);
-  } else if (data.data?.amount) {
+  } else if (data?.data?.amount) {
     price = parseFloat(data.data.amount);
   } else {
     throw new Error("Failed to parse EOS price.");
