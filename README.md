@@ -12,6 +12,9 @@ Nodejs v20.11.0
 yarn
  
 yarn build && yarn start
+
+# run ramOrderProcessor
+yarn start-ram-processor
  
 # or 
 

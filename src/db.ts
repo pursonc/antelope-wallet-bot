@@ -54,14 +54,41 @@ db.run(
   }
 );
 
-// Function to run queries
+// Ensure the 'ram_orders' table is created on startup
+db.run(
+  `
+    CREATE TABLE IF NOT EXISTS ram_orders (
+        order_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        eos_account_name TEXT,
+        ram_bytes INTEGER,
+        price_per_kb REAL,
+        order_status TEXT DEFAULT 'pending',
+        order_date TEXT,
+        trigger_date TEXT,
+        transaction_id TEXT,
+        failure_reason TEXT,
+        FOREIGN KEY(user_id) REFERENCES users(user_id)
+    )
+  `,
+  (err) => {
+    if (err) {
+      console.error("Error creating table:", err.message);
+    } else {
+      console.log("RAM Orders table created or already exists.");
+    }
+  }
+);
+
+
+// Function to get multiple rows
 export function runQuery(query: string, params: any[] = []): Promise<any> {
   return new Promise((resolve, reject) => {
-    db.run(query, params, function (err) {
+    db.all(query, params, (err, rows) => {
       if (err) {
         return reject(err);
       }
-      resolve(this);
+      resolve(rows);
     });
   });
 }
@@ -77,5 +104,6 @@ export function getQuery(query: string, params: any[] = []): Promise<any> {
     });
   });
 }
+
 
 export default db;

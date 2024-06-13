@@ -41,12 +41,13 @@ bot.onText(/\/start/, async (msg: Message) => {
     if (allowed) {
       const eosPrice = await getEosPrice();
       const eosRamPrice = await getEosRamPrice();
-      let welcomeMessage = `EOS Bot: Your Gateway to EOS 🤖\n\n🔹 EOS: $${eosPrice}\n🔹 RAM: ${eosRamPrice} EOS/kb`;
+      let welcomeMessage = `*EOS Bot: Your Gateway to EOS 🤖*\n\n🔹 EOS: $${eosPrice}\n🔹 RAM: ${eosRamPrice} EOS/kb\n\n[Github](https://github.com/pursonchen/eos-mummmy-bot)`;
 
       bot.sendMessage(msg.chat.id, welcomeMessage, {
         reply_markup: {
           inline_keyboard: START_MENU,
         },
+        parse_mode: "Markdown",
       });
     } else {
       bot.sendMessage(
@@ -103,6 +104,75 @@ bot.on("callback_query", async (callbackQuery: CallbackQuery) => {
     }
   }
 
+  if (callbackQuery.data && callbackQuery.data.startsWith("view_ram_orders:")) {
+    const pageSize = 5; // 每页显示的订单数
+    const currentPage = parseInt(callbackQuery.data.split(":")[1]) || 1;
+    const offset = (currentPage - 1) * pageSize;
+
+    const ramOrdersList = await runQuery(
+      "SELECT * FROM ram_orders WHERE user_id = ? ORDER BY order_date DESC LIMIT ? OFFSET ?",
+      [userId, pageSize, offset]
+    );
+
+    const totalOrders = await getQuery(
+      "SELECT COUNT(*) as count FROM ram_orders WHERE user_id = ?",
+      [userId]
+    );
+
+    const totalPages = Math.ceil(totalOrders.count / pageSize);
+
+    let orderMessage = `Your RAM Orders ${offset + ramOrdersList.length}/${
+      totalOrders.count
+    }:\n\n`;
+    if (ramOrdersList && ramOrdersList.length > 0) {
+      const ordersArray = Array.isArray(ramOrdersList)
+        ? ramOrdersList
+        : [ramOrdersList];
+      ordersArray.forEach((order) => {
+        orderMessage += `🔹 Account Name: ${order.eos_account_name}\n🔹 RAM Amount: ${order.ram_bytes} bytes\n🔹 Price per KB: ${order.price_per_kb} EOS\n🔹 Status: ${order.order_status}\n🔹 Order Date(UTC): ${order.order_date}\n`;
+        if (order.order_status === "success") {
+          orderMessage += `🔹 Transaction ID: ${order.transaction_id}\n`;
+        } else if (order.order_status === "failed") {
+          orderMessage += `🔹 Failure Reason: ${order.failure_reason}\n`;
+        }
+        orderMessage += "\n";
+      });
+    } else {
+      orderMessage += "No RAM orders found.";
+    }
+
+    const inlineKeyboardOrder = [
+      [{ text: "↔️ Wallet", callback_data: "wallets" }],
+    ];
+
+    if (currentPage > 1) {
+      inlineKeyboardOrder.unshift([
+        {
+          text: "⬅️ Previous",
+          callback_data: `view_ram_orders:${currentPage - 1}`,
+        },
+      ]);
+    }
+
+    if (currentPage < totalPages) {
+      inlineKeyboardOrder.unshift([
+        {
+          text: "➡️ Next",
+          callback_data: `view_ram_orders:${currentPage + 1}`,
+        },
+      ]);
+    }
+
+    inlineKeyboardOrder.unshift([
+      { text: "Clear Orders", callback_data: "clear_ram_orders" },
+    ]);
+
+    bot.sendMessage(chatId!, orderMessage, {
+      reply_markup: {
+        inline_keyboard: inlineKeyboardOrder,
+      },
+    });
+  }
   try {
     switch (callbackQuery.data) {
       case "wallets":
@@ -112,6 +182,11 @@ bot.on("callback_query", async (callbackQuery: CallbackQuery) => {
         );
         let message = "Please Create Account or Import Account.";
         let inlineKeyboard;
+        const ramOrders = await runQuery(
+          "SELECT * FROM ram_orders WHERE user_id = ?",
+          [userId]
+        );
+
         if (
           user &&
           user.eos_account_name &&
@@ -120,9 +195,20 @@ bot.on("callback_query", async (callbackQuery: CallbackQuery) => {
         ) {
           const { eos_account_name, eos_public_key, eos_private_key } = user;
           const privateKey = decrypt(eos_private_key, userId);
-          const eosBalance = await getEosBalance(eos_account_name); // Assume this function exists and gets the balance
-          message = `🔹 Account Name: <code>${eos_account_name}</code>\n🔹 Public Key: <code>${eos_public_key}</code>\n🔹 Private Key: <span class="tg-spoiler">${privateKey}</span>\n🔹 Balance: ${eosBalance} EOS`;
+          const eosBalance = await getEosBalance(eos_account_name);
+          message = `🔹 Account Name: <code>${eos_account_name}</code>\n🔹 Public Key: <code>${eos_public_key}</code>\n🔹 Private Key(backup 1st): <span class="tg-spoiler">${privateKey}</span>\n🔹 Balance: ${eosBalance} EOS`;
+
           inlineKeyboard = WALLET_MENU_WITH_ACCOUNT;
+          if (ramOrders && ramOrders.length > 0) {
+            const existingRamOrdersButton = inlineKeyboard.find(
+              (button) => button[0].callback_data === "view_ram_orders"
+            );
+            if (!existingRamOrdersButton) {
+              inlineKeyboard.unshift([
+                { text: "📜 My RAM Limit Orders", callback_data: "view_ram_orders" },
+              ]);
+            }
+          }
         } else {
           const order = await getQuery(
             "SELECT eos_account_name FROM account_orders WHERE user_id = ?",
@@ -162,7 +248,7 @@ bot.on("callback_query", async (callbackQuery: CallbackQuery) => {
           try {
             const { publicKey, encryptedPrivateKey, accounts } =
               await importEosAccount(msg.text, userId);
-
+            console.log(accounts);
             if (accounts.length === 1) {
               const { accountName, permissionName } = accounts[0];
 
@@ -524,7 +610,8 @@ bot.on("callback_query", async (callbackQuery: CallbackQuery) => {
       case "transfer_eos":
         bot.sendMessage(
           chatId!,
-          "Enter Addresses with Amounts and memo(optional). The address and amount are separated by commas.\n\nExample:\nbig.one,0.001\naus1genereos,1,ThisIsTheMemo\nnewdex.bp,3.45,This_is_The_memo(_ will be replaced with space)"
+          "Enter Addresses with Amounts and memo(optional). The address and amount are separated by commas.\n\n&lt;receiver&gt;,&lt;amount&gt;,&lt;memo&gt;\n\n<b>Example (Click to Copy):</b>\n1.<code>big.one,0.001</code>\n2.<code>aus1genereos,1,ThisIsTheMemo</code>\n3.<code>newdex.bp,3.45,This_is_The_memo</code>\n<i>(_ will be replaced with space)</i>",
+          { parse_mode: "HTML" }
         );
         bot.once("message", async (msg: Message) => {
           const chatId = msg.chat.id;
@@ -568,10 +655,10 @@ bot.on("callback_query", async (callbackQuery: CallbackQuery) => {
                 error.message.toLowerCase().includes("cpu") ||
                 error.message.toLowerCase().includes("net")
               ) {
-                 const user = await getQuery(
-                   "SELECT eos_account_name, eos_public_key, eos_private_key FROM users WHERE user_id = ?",
-                   [userId]
-                 );
+                const user = await getQuery(
+                  "SELECT eos_account_name, eos_public_key, eos_private_key FROM users WHERE user_id = ?",
+                  [userId]
+                );
                 error.message += `\n\nYour account resources are insufficient. Please visit [this website](https://eospowerup.io/free) and enter your account ${user.eos_account_name} to get free resources, or add [this Telegram bot](https://t.me/eospowerupbot) to get assistance.`;
               }
               errorMessage = error.message;
@@ -592,7 +679,8 @@ bot.on("callback_query", async (callbackQuery: CallbackQuery) => {
         const eosRamPrice = await getEosRamPrice();
         bot.sendMessage(
           chatId!,
-          `RAM price: ${eosRamPrice} EOS/kb\n\nEnter Addresses with Amounts (supports bytes or EOS amount)\nThe address and amount are separated by commas.\n\nExample:\nbig.one,1024bytes\nwharfkit1112,1.2kb\nwharfkit1112,1mb\nwharfkit1112,2.1gb\naus1genereos,1EOS\nnewdex.bp,3.45EOS`
+          `RAM price: ${eosRamPrice} EOS/kb\n\nEnter Addresses with Amounts (supports bytes or EOS amount)\nThe address and amount are separated by commas.\n\n&lt;receiver&gt;,&lt;ram_bytes&gt; or &lt;ram_of_eos_price&gt;\n\n<b>Example (Click to Copy):</b>\n1.<code>big.one,1024bytes</code>\n2.<code>wharfkit1112,1.2kb</code>\n3.<code>wharfkit1112,1mb</code>\n4.<code>wharfkit1112,2.1gb</code>\n5.<code>aus1genereos,1EOS</code>\n6.<code>newdex.bp,3.45EOS</code>`,
+          { parse_mode: "HTML" }
         );
         bot.once("message", async (msg: Message) => {
           const chatId = msg.chat.id;
@@ -653,6 +741,10 @@ bot.on("callback_query", async (callbackQuery: CallbackQuery) => {
                 error.message.toLowerCase().includes("cpu") ||
                 error.message.toLowerCase().includes("net")
               ) {
+                const user = await getQuery(
+                  "SELECT eos_account_name FROM users WHERE user_id = ?",
+                  [userId]
+                );
                 error.message += `\n\nYour account resources are insufficient. Please visit [this website](https://eospowerup.io/free) and enter your account ${user.eos_account_name} to get free resources, or add [this Telegram bot](https://t.me/eospowerupbot) to get assistance.`;
               }
               errorMessage = error.message;
@@ -663,6 +755,7 @@ bot.on("callback_query", async (callbackQuery: CallbackQuery) => {
                   [{ text: "↔️ Wallet", callback_data: "wallets" }],
                 ],
               },
+              parse_mode: "Markdown",
             });
           }
         });
@@ -694,10 +787,140 @@ bot.on("callback_query", async (callbackQuery: CallbackQuery) => {
         }
         break;
 
+      case "ram_order":
+        const ramPrice = await getEosRamPrice();
+       bot.sendMessage(
+         chatId!,
+         `RAM Price:${ramPrice} EOS/kb \n\n Enter RAM order details in the format: \n\naccount_name,ram_amount(EOS or bytes),price_per_kb(EOS)\n\n<b>Example (Click to Copy):</b>\n1.<code>myaccount,1024bytes,0.01</code>\n2.<code>myaccount,1kb,0.01</code>\n3.<code>myaccount,1mb,0.01</code>\n4.<code>myaccount,1gb,0.01</code>`,
+         { parse_mode: "HTML" }
+       );
+        bot.once("message", async (msg: Message) => {
+          const chatId = msg.chat.id;
+          const userId = msg.from!.id;
+
+          if (!msg.text) {
+            bot.sendMessage(chatId, "Please provide the RAM order details.");
+            return;
+          }
+
+          const [accountName, ramAmount, pricePerKb] = msg.text.split(",");
+          const ramBytes = convertToBytes(ramAmount);
+          const price = parseFloat(pricePerKb);
+
+          const existingOrders = await runQuery(
+            "SELECT COUNT(*) AS order_count FROM ram_orders WHERE user_id = ? AND order_status = 'pending'",
+            [userId]
+          );
+
+          if (existingOrders.order_count >= 5) {
+            bot.sendMessage(
+              chatId,
+              "You have reached the maximum limit of 5 pending RAM orders."
+            );
+            return;
+          }
+
+          await runQuery(
+            "INSERT INTO ram_orders (user_id, eos_account_name, ram_bytes, price_per_kb, order_status, order_date) VALUES (?, ?, ?, ?, 'pending', datetime('now'))",
+            [userId, accountName, ramBytes, price]
+          );
+
+          bot.sendMessage(chatId, "RAM order created successfully.", {
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: "↔️ Wallet", callback_data: "wallets" }],
+              ],
+            },
+          });
+        });
+        break;
+
+      case "view_ram_orders":
+        const pageSize = 5; // 每页显示的订单数
+        const currentPage = 1;
+        const offset = (currentPage - 1) * pageSize;
+
+        const ramOrdersList = await runQuery(
+          "SELECT * FROM ram_orders WHERE user_id = ? ORDER BY order_date DESC LIMIT ? OFFSET ?",
+          [userId, pageSize, offset]
+        );
+
+        const totalOrders = await getQuery(
+          "SELECT COUNT(*) as count FROM ram_orders WHERE user_id = ?",
+          [userId]
+        );
+
+        const totalPages = Math.ceil(totalOrders.count / pageSize);
+
+        let orderMessage = `Your RAM Orders ${offset + ramOrdersList.length}/${
+          totalOrders.count
+        }:\n\n`;
+        if (ramOrdersList && ramOrdersList.length > 0) {
+          const ordersArray = Array.isArray(ramOrdersList)
+            ? ramOrdersList
+            : [ramOrdersList];
+          ordersArray.forEach((order) => {
+            orderMessage += `🔹 Account Name: ${order.eos_account_name}\n🔹 RAM Amount: ${order.ram_bytes} bytes\n🔹 Price per KB: ${order.price_per_kb} EOS\n🔹 Status: ${order.order_status}\n🔹 Order Date(UTC): ${order.order_date}\n`;
+            if (order.order_status === "success") {
+              orderMessage += `🔹 Transaction ID: ${order.transaction_id}\n`;
+            } else if (order.order_status === "failed") {
+              orderMessage += `🔹 Failure Reason: ${order.failure_reason}\n`;
+            }
+            orderMessage += "\n";
+          });
+        } else {
+          orderMessage += "No RAM orders found.";
+        }
+
+        const inlineKeyboardOrder = [
+          [{ text: "↔️ Wallet", callback_data: "wallets" }],
+        ];
+
+        if (currentPage > 1) {
+          inlineKeyboardOrder.unshift([
+            {
+              text: "⬅️ Previous",
+              callback_data: `view_ram_orders:${currentPage - 1}`,
+            },
+          ]);
+        }
+
+        if (currentPage < totalPages) {
+          inlineKeyboardOrder.unshift([
+            {
+              text: "➡️ Next",
+              callback_data: `view_ram_orders:${currentPage + 1}`,
+            },
+          ]);
+        }
+
+        inlineKeyboardOrder.unshift([
+          { text: "Clear Orders", callback_data: "clear_ram_orders" },
+        ]);
+
+        bot.sendMessage(chatId!, orderMessage, {
+          reply_markup: {
+            inline_keyboard: inlineKeyboardOrder,
+          },
+        });
+        break;
+
+      case "clear_ram_orders":
+        await runQuery("DELETE FROM ram_orders WHERE user_id = ?", [userId]);
+        bot.sendMessage(chatId!, "All your RAM orders have been cleared.", {
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "↔️ Wallet", callback_data: "wallets" }],
+            ],
+          },
+        });
+        break;
+
       default:
         if (
           callbackQuery.data &&
-          !callbackQuery.data.startsWith("select_account:")
+          !callbackQuery.data.startsWith("select_account:") &&
+          !callbackQuery.data.startsWith("view_ram_orders:")
         ) {
           bot.sendMessage(chatId!, "Unknown command" + callbackQuery.data);
         }

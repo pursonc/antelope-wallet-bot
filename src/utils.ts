@@ -142,12 +142,12 @@ export async function getEosAccountInfo(accountName: string): Promise<{ ramUsage
     throw new Error("No account data found.");
   }
 
-  const ramUsage = data.ram_usage;
-  const ramQuota = data.ram_quota;
-  const netUsageUsed = data.net_limit.used;
-  const netUsageMax = data.net_limit.max;
-  const cpuUsageUsed = data.cpu_limit.used;
-  const cpuUsageMax = data.cpu_limit.max;
+  const ramUsage = data.ram_usage || 0;
+  const ramQuota = data.ram_quota || 0;
+  const netUsageUsed = data.net_limit?.used || 0;
+  const netUsageMax = data.net_limit?.max || 0;
+  const cpuUsageUsed = data.cpu_limit?.used || 0;
+  const cpuUsageMax = data.cpu_limit?.max || 0;
 
   return { ramUsage, ramQuota, netUsageUsed, netUsageMax, cpuUsageUsed, cpuUsageMax };
 }

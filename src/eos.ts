@@ -105,6 +105,7 @@ export async function importEosAccount(eosPrivateKey: string, userId: number) {
   try {
     const privateKey = PrivateKey.from(eosPrivateKey);
     const publicKey = privateKey.toPublic().toString();
+    const lPubKey = PublicKey.from(publicKey);
     const encryptedPrivateKey = encrypt(eosPrivateKey, userId);
 
     // Use WharfKit to get the account name associated with the private key
@@ -122,7 +123,7 @@ export async function importEosAccount(eosPrivateKey: string, userId: number) {
       permissionName: account.permission_name,
     }));
 
-    return { publicKey, encryptedPrivateKey, accounts };
+    return { publicKey: lPubKey.toLegacyString(), encryptedPrivateKey, accounts };
   } catch (error: unknown) {
     let errorMessage = "Unknown error";
     if (error instanceof Error) {
@@ -205,7 +206,7 @@ export async function buyRamBytes(
     permission: user.permission_name,
     walletPlugin: new WalletPluginPrivateKey(privateKey),
   });
-console.log(`bytes: ${bytes}`)
+console.log(`${user.eos_account_name} buy ram bytes: ${bytes}`);
   const result = await session.transact({
     actions: [
       {

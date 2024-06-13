@@ -5,6 +5,7 @@
   "main": "src/bot.ts",
   "scripts": {
     "start": "node dist/bot.js",
+    "start-ram-processor": "node dist/ramOrderProcessor.js",
     "build": "tsc",
     "dev": "ts-node-dev src/bot.ts"
   },
