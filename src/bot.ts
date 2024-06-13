@@ -248,17 +248,17 @@ bot.on("callback_query", async (callbackQuery: CallbackQuery) => {
           try {
             const { publicKey, encryptedPrivateKey, accounts } =
               await importEosAccount(msg.text, userId);
-            console.log(accounts);
+            
             if (accounts.length === 1) {
               const { accountName, permissionName } = accounts[0];
-
+              // console.log(accountName);
               await runQuery(
                 "UPDATE users SET eos_account_name = ?, eos_public_key = ?, eos_private_key = ?, permission_name = ? WHERE user_id = ?",
                 [
-                  accountName,
+                  `${accountName}`,
                   publicKey,
                   encryptedPrivateKey,
-                  permissionName,
+                  `${permissionName}`,
                   userId,
                 ]
               );
@@ -326,7 +326,7 @@ bot.on("callback_query", async (callbackQuery: CallbackQuery) => {
           [userId, eosAccountName, publicKey, encrypt(privateKey, userId)]
         );
 
-        const contractMessage = `<b>EOS Account Order</b>\n\nCreate Account Name: <code>${eosAccountName}</code>\n\nCreation Steps:\n1. Transfer 4 EOS to the following account: \n\n <code>signupeoseos</code> \n\n with the memo: \n<code>${eosAccountName}-${publicKey}</code>\n\n2. After transfer is complete, wait for 1 minute and then click the activation button below.\n\n⚠️ Note: The bot does not charge any fee during the creation process. If the account creation fails and leads to asset loss, TokenPocket cannot help you recover assets.\n\nPlease complete the registration order as soon as possible. Once the account name is taken, the EOS cannot be refunded.`;
+        const contractMessage = `<b>EOS Account Order</b>\n\nCreate Account Name: <code>${eosAccountName}</code>\n\nCreation Steps:\n1. Transfer 4 EOS to the following account: \n\n <code>signupeoseos</code> \n\n with the memo: \n<code>${eosAccountName}-${publicKey}</code>\n\n2. After transfer is complete, wait for 1 minute and then click the activation button below.\n\n⚠️ Note: The bot does not charge any fee during the creation process. If the account creation fails and leads to asset loss, The bot cannot help you recover assets.\n\nPlease complete the registration order as soon as possible. Once the account name is taken, the EOS cannot be refunded.`;
 
         bot.sendMessage(chatId!, contractMessage, {
           parse_mode: "HTML",
@@ -764,6 +764,10 @@ bot.on("callback_query", async (callbackQuery: CallbackQuery) => {
       case "delete":
         await runQuery(
           "UPDATE users SET eos_account_name = NULL, eos_public_key = NULL, eos_private_key = NULL, permission_name = NULL WHERE user_id = ?",
+          [userId]
+        );
+        await runQuery(
+          "DELETE from ram_orders WHERE user_id = ?",
           [userId]
         );
         bot.editMessageText("Your EOS account information has been deleted.", {

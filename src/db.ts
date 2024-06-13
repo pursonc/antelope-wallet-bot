@@ -83,6 +83,7 @@ db.run(
 
 // Function to get multiple rows
 export function runQuery(query: string, params: any[] = []): Promise<any> {
+  // console.log("Query:", query, params);
   return new Promise((resolve, reject) => {
     db.all(query, params, (err, rows) => {
       if (err) {
@@ -95,6 +96,7 @@ export function runQuery(query: string, params: any[] = []): Promise<any> {
 
 // Function to get a single row
 export function getQuery(query: string, params: any[] = []): Promise<any> {
+  //  console.log("Query:", query, params);
   return new Promise((resolve, reject) => {
     db.get(query, params, (err, row) => {
       if (err) {
