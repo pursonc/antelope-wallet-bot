@@ -7,7 +7,10 @@ export const START_MENU = [
 export const WALLET_MENU_WITH_ACCOUNT = [
   [{ text: "Transfer EOS", callback_data: "transfer_eos" }],
   [{ text: "Buy RAM", callback_data: "buy_ram" }],
-  [{ text: "❌ Close", callback_data: "close" }],
+  [{ text: "Delete Account", callback_data: "delete" }],
+  [{ text: "Order Status", callback_data: "order_status" }], // 添加订单按钮
+  [{ text: "↔️ Wallet", callback_data: "wallets" }],
+  [{ text: "Activate Account", callback_data: "activate_account" }],
 ];
 
 export const WALLET_MENU_NO_ACCOUNT = [

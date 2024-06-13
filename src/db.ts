@@ -32,6 +32,28 @@ db.run(
   }
 );
 
+// Ensure the 'account_orders' table is created on startup
+db.run(
+  `
+    CREATE TABLE IF NOT EXISTS account_orders (
+        order_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        eos_account_name TEXT,
+        eos_public_key TEXT,
+        eos_private_key TEXT,
+        activated BOOLEAN DEFAULT 0,
+        FOREIGN KEY(user_id) REFERENCES users(user_id)
+    )
+`,
+  (err) => {
+    if (err) {
+      console.error("Error creating table:", err.message);
+    } else {
+      console.log("Account orders table created or already exists.");
+    }
+  }
+);
+
 // Function to run queries
 export function runQuery(query: string, params: any[] = []): Promise<any> {
   return new Promise((resolve, reject) => {

@@ -199,3 +199,15 @@ export function convertToBytes(amount: string): number {
     .slice(1);
   return parseFloat(value) * units[unit];
 }
+
+// Step 2: Check if the EOS account already exists
+export async function checkEosAccountExists(accountName: string): Promise<boolean> {
+  const fastestEndpoint = await selectFastestEndpoint();
+  const response = await fetch(`${fastestEndpoint}/v1/chain/get_account`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ account_name: accountName }),
+  });
+  const data = await response.json();
+  return !!data.account_name;
+}

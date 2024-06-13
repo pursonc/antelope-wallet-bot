@@ -2,14 +2,16 @@ import TelegramBot, { Message, CallbackQuery } from "node-telegram-bot-api";
 import dotenv from "dotenv";
 import { runQuery, getQuery } from "./db";
 import { isAllowed } from "./rateLimiter";
-import { getEosPrice, getEosRamPrice, sendWalletOptions, getEosAccountInfo, getEosBalance, convertToBytes } from "./utils";
+import { getEosPrice, getEosRamPrice, sendWalletOptions, getEosAccountInfo, getEosBalance, convertToBytes, checkEosAccountExists } from "./utils";
 import {
   importEosAccount,
   decrypt,
-  createEosAccount,
+  generateEosAccountName,
   transferEos,
   buyRam,
   buyRamBytes,
+  generateEosKeyPair,
+  encrypt,
 } from "./eos";
 import { START_MENU, WALLET_MENU_NO_ACCOUNT, WALLET_MENU_WITH_ACCOUNT } from "./menu";
 
@@ -117,7 +119,19 @@ bot.on("callback_query", async (callbackQuery: CallbackQuery) => {
           message = `🔹 Account Name: <code>${eos_account_name}</code>\n🔹 Public Key: <code>${eos_public_key}</code>\n🔹 Private Key: <span class="tg-spoiler">${privateKey}</span>\n🔹 Balance: ${eosBalance} EOS`;
           inlineKeyboard = WALLET_MENU_WITH_ACCOUNT;
         } else {
-          inlineKeyboard = WALLET_MENU_NO_ACCOUNT;
+          const order = await getQuery(
+            "SELECT eos_account_name FROM account_orders WHERE user_id = ?",
+            [userId]
+          );
+          if (order) {
+            message = `You have an ongoing order for account: <code>${order.eos_account_name}</code>`;
+            inlineKeyboard = [
+              [{ text: "View Order", callback_data: "view_order" }],
+              [{ text: "❌ Close", callback_data: "close" }],
+            ];
+          } else {
+            inlineKeyboard = WALLET_MENU_NO_ACCOUNT;
+          }
         }
 
         bot.editMessageText(message, {
@@ -204,11 +218,163 @@ bot.on("callback_query", async (callbackQuery: CallbackQuery) => {
         break;
 
       case "create_account_contract":
-        await createEosAccount(bot, chatId!, userId, "contract");
+        const eosAccountName = await generateEosAccountName();
+        const accountExists = await checkEosAccountExists(eosAccountName);
+
+        if (accountExists) {
+          bot.sendMessage(
+            chatId!,
+            "Generated account already exists. Please try again."
+          );
+          return;
+        }
+
+        const { privateKey, publicKey } = generateEosKeyPair();
+        await runQuery(
+          "INSERT INTO account_orders (user_id, eos_account_name, eos_public_key, eos_private_key) VALUES (?, ?, ?, ?)",
+          [userId, eosAccountName, publicKey, encrypt(privateKey, userId)]
+        );
+
+        const contractMessage = `<b>EOS Account Order</b>\n\nCreate Account Name: <code>${eosAccountName}</code>\n\nCreation Steps:\n1. Transfer 4 EOS to the following account: \n\n <code>signupeoseos</code> \n\n with the memo: \n<code>${eosAccountName}-${publicKey}</code>\n\n2. After transfer is complete, wait for 1 minute and then click the activation button below.\n\n⚠️ Note: The bot does not charge any fee during the creation process. If the account creation fails and leads to asset loss, TokenPocket cannot help you recover assets.\n\nPlease complete the registration order as soon as possible. Once the account name is taken, the EOS cannot be refunded.`;
+
+        bot.sendMessage(chatId!, contractMessage, {
+          parse_mode: "HTML",
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "Activate", callback_data: "activate_account" }],
+              [{ text: "↔️ Wallet", callback_data: "wallets" }],
+            ],
+          },
+        });
+        break;
+      case "orders":
+        const pendingOrder = await getQuery(
+          "SELECT eos_account_name, public_key FROM orders WHERE user_id = ?",
+          [userId]
+        );
+        if (pendingOrder) {
+          const { eos_account_name, public_key } = pendingOrder;
+          const activateMessage = `Your pending account creation order:\n\n🔹 Account Name: <code>${eos_account_name}</code>\n🔹 Public Key: <code>${public_key}</code>\n\nPlease activate the account creation process.`;
+
+          bot.editMessageText(activateMessage, {
+            chat_id: chatId,
+            message_id: callbackQuery.message?.message_id,
+            parse_mode: "HTML",
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  {
+                    text: "Activate Account",
+                    callback_data: "activate_account",
+                  },
+                ],
+                [{ text: "↔️ Wallet", callback_data: "wallets" }],
+              ],
+            },
+          });
+        } else {
+          bot.sendMessage(chatId!, "No pending orders found.", {
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: "↔️ Wallet", callback_data: "wallets" }],
+              ],
+            },
+          });
+        }
         break;
 
-      case "create_account_auto":
-        await createEosAccount(bot, chatId!, userId, "auto");
+      case "activate_account":
+        const order = await getQuery(
+          "SELECT eos_account_name, eos_public_key, eos_private_key FROM account_orders WHERE user_id = ?",
+          [userId]
+        );
+        if (order) {
+          const { eos_account_name, eos_public_key, eos_private_key } = order;
+          const accountExists = await checkEosAccountExists(
+            order.eos_account_name
+          );
+          if (accountExists) {
+            await runQuery(
+              "UPDATE users SET eos_account_name = ?, eos_public_key = ?, eos_private_key = ? WHERE user_id = ?",
+              [eos_account_name, eos_public_key, eos_private_key, userId]
+            );
+            await runQuery("DELETE FROM orders WHERE user_id = ?", [userId]);
+
+            bot.sendMessage(
+              chatId!,
+              `Account activated successfully!\n\n🔹 Account Name: ${order.eos_account_name}\n🔹 Public Key: ${order.eos_public_key}`,
+              {
+                reply_markup: {
+                  inline_keyboard: [
+                    [{ text: "↔️ Wallet", callback_data: "wallets" }],
+                  ],
+                },
+              }
+            );
+          } else {
+            bot.sendMessage(
+              chatId!,
+              `Account activation failed. The account ${order.eos_account_name} does not exist yet.`,
+              {
+                reply_markup: {
+                  inline_keyboard: [
+                    [{ text: "↔️ Wallet", callback_data: "wallets" }],
+                  ],
+                },
+              }
+            );
+          }
+        } else {
+          bot.sendMessage(chatId!, "No pending orders found.", {
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: "↔️ Wallet", callback_data: "wallets" }],
+              ],
+            },
+          });
+        }
+        break;
+
+      case "delete_order":
+        await runQuery("DELETE FROM account_orders WHERE user_id = ?", [
+          userId,
+        ]);
+        bot.sendMessage(chatId!, "Your account order has been deleted.", {
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "↔️ Wallet", callback_data: "wallets" }],
+            ],
+          },
+        });
+        break;
+      case "view_order":
+        const orderDetails = await getQuery(
+          "SELECT eos_account_name, eos_public_key FROM account_orders WHERE user_id = ?",
+          [userId]
+        );
+        if (orderDetails) {
+          const { eos_account_name, eos_public_key } = orderDetails;
+          const contractMessage = `<b>EOS Account Order</b>\n\nCreate Account Name: <code>${eos_account_name}</code>\n\nCreation Steps:\n1. Transfer 4 EOS to the following contract: \n\n <code>signupeoseos</code> \n\n with the memo: \n<code>${eos_account_name}-${eos_public_key}</code>\n\n2. After transfer is complete, wait for 1 minute and then click the activation button below.\n\n⚠️ Note: The bot does not charge any fee during the creation process. If the account creation fails and leads to asset loss, TokenPocket cannot help you recover assets.\n\nPlease complete the registration order as soon as possible. Once the account name is taken, the EOS cannot be refunded.`;
+
+          bot.sendMessage(chatId!, contractMessage, {
+            parse_mode: "HTML",
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: "❌ Delete Order", callback_data: "delete_order" }],
+                [{ text: "Activate", callback_data: "activate_account" }],
+                [{ text: "↔️ Wallet", callback_data: "wallets" }],
+              ],
+            },
+          });
+        } else {
+          bot.sendMessage(chatId!, "No pending order found.", {
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: "↔️ Wallet", callback_data: "wallets" }],
+              ],
+            },
+          });
+        }
         break;
 
       case "profile":
@@ -312,6 +478,36 @@ bot.on("callback_query", async (callbackQuery: CallbackQuery) => {
           });
         }
         break;
+      case "order_status":
+        const order_book = await getQuery(
+          "SELECT eos_account_name FROM account_orders WHERE user_id = ?",
+          [userId]
+        );
+
+        if (order_book) {
+          const { eos_account_name } = order_book;
+          const message = `Pending account order:\n🔹 Account Name: <code>${eos_account_name}</code>\n\nPlease complete the account creation and then click 'Activate'.`;
+
+          bot.sendMessage(chatId!, message, {
+            parse_mode: "HTML",
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: "🔄 Activate", callback_data: "activate_account" }],
+                [{ text: "↔️ Wallet", callback_data: "wallets" }],
+              ],
+            },
+          });
+        } else {
+          bot.sendMessage(chatId!, "No pending account orders found.", {
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: "↔️ Wallet", callback_data: "wallets" }],
+              ],
+            },
+          });
+        }
+        break;
+
       case "transfer_eos":
         bot.sendMessage(
           chatId!,
@@ -330,7 +526,12 @@ bot.on("callback_query", async (callbackQuery: CallbackQuery) => {
           const memo = memoParts.join(",").replace(/_/g, " ") || "";
 
           try {
-            const result = await transferEos(userId, recipient, Number(amount), memo);
+            const result = await transferEos(
+              userId,
+              recipient,
+              Number(amount),
+              memo
+            );
             const transactionId = result.transaction_id;
             const transactionLink = `https://bloks.io/transaction/${transactionId}`;
             bot.sendMessage(

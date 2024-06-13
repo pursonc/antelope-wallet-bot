@@ -1,4 +1,4 @@
-import { APIClient, PrivateKey } from "@wharfkit/antelope";
+import { APIClient, PrivateKey, PublicKey } from "@wharfkit/antelope";
 import { Session } from "@wharfkit/session";
 import { WalletPluginPrivateKey } from "@wharfkit/wallet-plugin-privatekey";
 import crypto from "crypto";
@@ -34,7 +34,11 @@ export function generateEosKeyPair(): {
 } {
   const privateKey = PrivateKey.generate("K1"); // Using 'K1' curve
   const publicKey = privateKey.toPublic().toString();
-  return { privateKey: privateKey.toString(), publicKey };
+  const lPubKey = PublicKey.from(publicKey);
+  return {
+    privateKey: privateKey.toWif(),
+    publicKey: lPubKey.toLegacyString(),
+  };
 }
 
 function generateKeyFromUserId(userId: number): Buffer {

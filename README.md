@@ -20,3 +20,7 @@ yarn dev
 https://t.me/eos_mommmy_bot
 ```
 
+
+## 3. account create contract
+
+https://github.com/cppfuns/signdappplay
