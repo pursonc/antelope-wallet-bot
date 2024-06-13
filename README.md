@@ -1,13 +1,21 @@
 # EOS MOMMMY BOT
 
+## 1. Apply the telegram bot key from https://t.me/BotFather
+
+
+## 2. Set up Node.js Enviroment
+
+Nodejs v20.11.0
+
+
 ```
 yarn
  
-yarn build
+yarn build && yarn start
  
-yarn dev
+# or 
 
-yarn add node-telegram-bot-api
+yarn dev
 
 https://t.me/eos_mommmy_bot
 ```

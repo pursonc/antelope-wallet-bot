@@ -164,3 +164,38 @@ export function sendWalletOptions(
     },
   });
 }
+
+
+export async function getEosBalance(accountName: string): Promise<string> {
+  const fastestEndpoint = await selectFastestEndpoint();
+  const response = await fetch(
+    `${fastestEndpoint}/v1/chain/get_currency_balance`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        code: "eosio.token",
+        account: accountName,
+      }),
+    }
+  );
+  const data = await response.json();
+  if (!data || !data.length) {
+    throw new Error("No balance data found.");
+  }
+  return data[0];
+}
+
+export function convertToBytes(amount: string): number {
+  const units: { [key: string]: number } = {
+    bytes: 1,
+    kb: 1024,
+    mb: 1024 * 1024,
+    gb: 1024 * 1024 * 1024,
+  };
+  const [value, unit] = amount
+    .toLowerCase()
+    .match(/([0-9.]+)(bytes|kb|mb|gb)/)!
+    .slice(1);
+  return parseFloat(value) * units[unit];
+}

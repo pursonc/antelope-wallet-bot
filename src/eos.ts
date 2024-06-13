@@ -1,9 +1,10 @@
 import { APIClient, PrivateKey } from "@wharfkit/antelope";
+import { Session } from "@wharfkit/session";
+import { WalletPluginPrivateKey } from "@wharfkit/wallet-plugin-privatekey";
 import crypto from "crypto";
 import { runQuery, getQuery } from "./db";
 import TelegramBot from "node-telegram-bot-api";
 import { sendWalletOptions, selectFastestEndpoint } from "./utils";
-
 
 
 
@@ -126,5 +127,142 @@ export async function importEosAccount(eosPrivateKey: string, userId: number) {
    throw new Error("Error importing EOS account: ${errorMessage}");
 
   }
+}
+
+ 
+
+export async function transferEos(
+  userId: number,
+  recipient: string,
+  amount: number,
+  memo: string
+): Promise<any> {
+  const user = await getQuery(
+    "SELECT eos_private_key, permission_name, eos_account_name FROM users WHERE user_id = ?",
+    [userId]
+  );
+  const privateKey = decrypt(user.eos_private_key, userId);
+  
+
+  const session = new Session({
+    chain: {
+      id: "aca376f206b8fc25a6ed44dbdc66547c36c6c33e3a119ffbeaef943642f0e906",
+      url: "https://eos.greymass.com",
+    },
+    actor: user.eos_account_name,
+    permission: user.permission_name,
+    walletPlugin: new WalletPluginPrivateKey(privateKey),
+  });
+
+  const actions = [
+    {
+      account: "eosio.token",
+      name: "transfer",
+      authorization: [
+        {
+          actor: user.eos_account_name,
+          permission: user.permission_name,
+        },
+      ],
+      data: {
+        from: user.eos_account_name,
+        to: recipient,
+        quantity: `${amount.toFixed(4)} EOS`,
+        memo: memo,
+      },
+    },
+  ];
+
+  const result = await session.transact({ actions }, { broadcast: true });
+  return result;
+}
+
+
+export async function buyRamBytes(
+  userId: number,
+  recipient: string,
+  bytes: number
+): Promise<any> {
+  const user = await getQuery(
+    "SELECT eos_private_key, permission_name, eos_account_name FROM users WHERE user_id = ?",
+    [userId]
+  );
+  const privateKey = decrypt(user.eos_private_key, userId);
+
+  const session = new Session({
+    chain: {
+      id: "aca376f206b8fc25a6ed44dbdc66547c36c6c33e3a119ffbeaef943642f0e906",
+      url: "https://eos.greymass.com",
+    },
+    actor: user.eos_account_name,
+    permission: user.permission_name,
+    walletPlugin: new WalletPluginPrivateKey(privateKey),
+  });
+console.log(`bytes: ${bytes}`)
+  const result = await session.transact({
+    actions: [
+      {
+        account: "eosio",
+        name: "buyrambytes",
+        authorization: [
+          {
+            actor: user.eos_account_name,
+            permission: user.permission_name,
+          },
+        ],
+        data: {
+          payer: user.eos_account_name,
+          receiver: recipient,
+          bytes,
+        },
+      },
+    ],
+  });
+
+  return result;
+}
+
+export async function buyRam(
+  userId: number,
+  recipient: string,
+  amount: number
+): Promise<any> {
+  const user = await getQuery(
+    "SELECT eos_private_key, permission_name, eos_account_name FROM users WHERE user_id = ?",
+    [userId]
+  );
+  const privateKey = decrypt(user.eos_private_key, userId);
+
+  const session = new Session({
+    chain: {
+      id: "aca376f206b8fc25a6ed44dbdc66547c36c6c33e3a119ffbeaef943642f0e906",
+      url: "https://eos.greymass.com",
+    },
+    actor: user.eos_account_name,
+    permission: user.permission_name,
+    walletPlugin: new WalletPluginPrivateKey(privateKey),
+  });
+
+  const result = await session.transact({
+    actions: [
+      {
+        account: "eosio",
+        name: "buyram",
+        authorization: [
+          {
+            actor: user.eos_account_name,
+            permission: user.permission_name,
+          },
+        ],
+        data: {
+          payer: user.eos_account_name,
+          receiver: recipient,
+          quant: `${amount.toFixed(4)} EOS`,
+        },
+      },
+    ],
+  });
+
+  return result;
 }
 

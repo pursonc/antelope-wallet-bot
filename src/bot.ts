@@ -2,9 +2,16 @@ import TelegramBot, { Message, CallbackQuery } from "node-telegram-bot-api";
 import dotenv from "dotenv";
 import { runQuery, getQuery } from "./db";
 import { isAllowed } from "./rateLimiter";
-import { getEosPrice, getEosRamPrice, sendWalletOptions, getEosAccountInfo } from "./utils";
-import { importEosAccount, decrypt, createEosAccount } from "./eos";
-import { START_MENU, WALLET_MENU } from "./menu";
+import { getEosPrice, getEosRamPrice, sendWalletOptions, getEosAccountInfo, getEosBalance, convertToBytes } from "./utils";
+import {
+  importEosAccount,
+  decrypt,
+  createEosAccount,
+  transferEos,
+  buyRam,
+  buyRamBytes,
+} from "./eos";
+import { START_MENU, WALLET_MENU_NO_ACCOUNT, WALLET_MENU_WITH_ACCOUNT } from "./menu";
 
 // Load environment variables
 dotenv.config();
@@ -34,15 +41,11 @@ bot.onText(/\/start/, async (msg: Message) => {
       const eosRamPrice = await getEosRamPrice();
       let welcomeMessage = `EOS Bot: Your Gateway to EOS 🤖\n\n🔹 EOS: $${eosPrice}\n🔹 RAM: ${eosRamPrice} EOS/kb`;
 
-      bot.sendMessage(
-        msg.chat.id,
-        welcomeMessage,
-        {
-          reply_markup: {
-            inline_keyboard: START_MENU,
-          },
-        }
-      );
+      bot.sendMessage(msg.chat.id, welcomeMessage, {
+        reply_markup: {
+          inline_keyboard: START_MENU,
+        },
+      });
     } else {
       bot.sendMessage(
         msg.chat.id,
@@ -55,6 +58,7 @@ bot.onText(/\/start/, async (msg: Message) => {
     console.error("Database error:", error);
   }
 });
+
 
 bot.on("callback_query", async (callbackQuery: CallbackQuery) => {
   const userId = callbackQuery.from.id;
@@ -100,18 +104,20 @@ bot.on("callback_query", async (callbackQuery: CallbackQuery) => {
           [userId]
         );
         let message = "Please Create Account or Import Account.";
-        let inlineKeyboard = WALLET_MENU;
-        if (user) {
+        let inlineKeyboard;
+        if (
+          user &&
+          user.eos_account_name &&
+          user.eos_public_key &&
+          user.eos_private_key
+        ) {
           const { eos_account_name, eos_public_key, eos_private_key } = user;
-          if (eos_account_name && eos_public_key && eos_private_key) {
-             const privateKey = decrypt(
-               eos_private_key,
-               userId
-             );
-            message = `🔹 Account Name: <code>${eos_account_name}</code>\n🔹 Public Key: <code>${eos_public_key}</code>\n🔹 Private Key: <span class="tg-spoiler">${privateKey}</span>`;
-            inlineKeyboard = [[{ text: "❌ Close", callback_data: "close" }]];
-
-          }
+          const privateKey = decrypt(eos_private_key, userId);
+          const eosBalance = await getEosBalance(eos_account_name); // Assume this function exists and gets the balance
+          message = `🔹 Account Name: <code>${eos_account_name}</code>\n🔹 Public Key: <code>${eos_public_key}</code>\n🔹 Private Key: <span class="tg-spoiler">${privateKey}</span>\n🔹 Balance: ${eosBalance} EOS`;
+          inlineKeyboard = WALLET_MENU_WITH_ACCOUNT;
+        } else {
+          inlineKeyboard = WALLET_MENU_NO_ACCOUNT;
         }
 
         bot.editMessageText(message, {
@@ -284,7 +290,6 @@ bot.on("callback_query", async (callbackQuery: CallbackQuery) => {
           }
 
           const profileMessage = `🔹 Account Name: <code>${eos_account_name}</code>\n🔹 RAM: ${ramUsageStr} / ${ramQuotaStr}\n🔹 NET: ${netUsageUsedStr} / ${netUsageMaxStr}\n🔹 CPU: ${cpuUsageUsedStr} / ${cpuUsageMaxStr}`;
-          
 
           bot.editMessageText(profileMessage, {
             chat_id: chatId,
@@ -307,6 +312,130 @@ bot.on("callback_query", async (callbackQuery: CallbackQuery) => {
           });
         }
         break;
+      case "transfer_eos":
+        bot.sendMessage(
+          chatId!,
+          "Enter Addresses with Amounts and memo(optional). The address and amount are separated by commas.\n\nExample:\nbig.one,0.001\naus1genereos,1,ThisIsTheMemo\nnewdex.bp,3.45,This_is_The_memo(_ will be replaced with space)"
+        );
+        bot.once("message", async (msg: Message) => {
+          const chatId = msg.chat.id;
+          const userId = msg.from!.id;
+
+          if (!msg.text) {
+            bot.sendMessage(chatId, "Please provide the address and amount.");
+            return;
+          }
+
+          const [recipient, amount, ...memoParts] = msg.text.split(",");
+          const memo = memoParts.join(",").replace(/_/g, " ") || "";
+
+          try {
+            const result = await transferEos(userId, recipient, Number(amount), memo);
+            const transactionId = result.transaction_id;
+            const transactionLink = `https://bloks.io/transaction/${transactionId}`;
+            bot.sendMessage(
+              chatId,
+              `Successfully transferred ${amount} EOS to ${recipient}${
+                memo ? ` with memo: ${memo}` : ""
+              }.\n\n[View Transaction](${transactionLink})`,
+              {
+                reply_markup: {
+                  inline_keyboard: [
+                    [{ text: "↔️ Wallet", callback_data: "wallets" }],
+                  ],
+                },
+                parse_mode: "Markdown",
+              }
+            );
+          } catch (error: unknown) {
+            let errorMessage = "Unknown error";
+            if (error instanceof Error) {
+              errorMessage = error.message;
+            }
+            bot.sendMessage(chatId, `Error transferring EOS: ${errorMessage}`, {
+              reply_markup: {
+                inline_keyboard: [
+                  [{ text: "↔️ Wallet", callback_data: "wallets" }],
+                ],
+              },
+            });
+          }
+        });
+        break;
+
+      case "buy_ram":
+        const eosRamPrice = await getEosRamPrice();
+        bot.sendMessage(
+          chatId!,
+          `RAM price: ${eosRamPrice} EOS/kb\n\nEnter Addresses with Amounts (supports bytes or EOS amount)\nThe address and amount are separated by commas.\n\nExample:\nbig.one,1024bytes\nwharfkit1112,1.2kb\nwharfkit1112,1mb\nwharfkit1112,2.1gb\naus1genereos,1EOS\nnewdex.bp,3.45EOS`
+        );
+        bot.once("message", async (msg: Message) => {
+          const chatId = msg.chat.id;
+          const userId = msg.from!.id;
+
+          if (!msg.text) {
+            bot.sendMessage(chatId, "Please provide the required information.");
+            return;
+          }
+
+          const [recipient, amount] = msg.text.split(",");
+          const amountValue = parseFloat(amount);
+
+          try {
+            if (
+              amount.toLowerCase().includes("bytes") ||
+              amount.toLowerCase().includes("kb") ||
+              amount.toLowerCase().includes("mb") ||
+              amount.toLowerCase().includes("gb")
+            ) {
+              const bytes = convertToBytes(amount);
+              const result = await buyRamBytes(userId, recipient, bytes);
+              bot.sendMessage(
+                chatId,
+                `RAM bought successfully!\nTransaction ID: https://bloks.io/transaction/${result.transaction_id}`,
+                {
+                  reply_markup: {
+                    inline_keyboard: [
+                      [{ text: "↔️ Wallet", callback_data: "wallets" }],
+                    ],
+                  },
+                }
+              );
+            } else if (amount.toLowerCase().includes("eos")) {
+              const eosAmount = amountValue;
+              const result = await buyRam(userId, recipient, eosAmount);
+              bot.sendMessage(
+                chatId,
+                `RAM bought successfully!\nTransaction ID: https://bloks.io/transaction/${result.transaction_id}`,
+                {
+                  reply_markup: {
+                    inline_keyboard: [
+                      [{ text: "↔️ Wallet", callback_data: "wallets" }],
+                    ],
+                  },
+                }
+              );
+            } else {
+              bot.sendMessage(
+                chatId,
+                "Invalid amount format. Please use bytes, kb, mb, gb, or EOS."
+              );
+            }
+          } catch (error: unknown) {
+            let errorMessage = "Unknown error";
+            if (error instanceof Error) {
+              errorMessage = error.message;
+            }
+            bot.sendMessage(chatId, `Error buying RAM: ${errorMessage}`, {
+              reply_markup: {
+                inline_keyboard: [
+                  [{ text: "↔️ Wallet", callback_data: "wallets" }],
+                ],
+              },
+            });
+          }
+        });
+        break;
 
       case "delete":
         await runQuery(
@@ -317,10 +446,7 @@ bot.on("callback_query", async (callbackQuery: CallbackQuery) => {
           chat_id: chatId,
           message_id: callbackQuery.message?.message_id,
           reply_markup: {
-            inline_keyboard: [
-              
-              [{ text: "❌ Close", callback_data: "close" }],
-            ],
+            inline_keyboard: [[{ text: "❌ Close", callback_data: "close" }]],
           },
         });
         break;

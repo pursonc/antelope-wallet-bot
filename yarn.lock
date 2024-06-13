@@ -170,7 +170,7 @@
   resolved "https://registry.npmjs.org/@types/tough-cookie/-/tough-cookie-4.0.5.tgz"
   integrity sha512-/Ad8+nIOV7Rl++6f1BdKxFSMgmoqEoYbHRpPcx3JEfv8VRsQe9Z4mCXeJBzxs7mbHY/XOZZuXlRNfhpVPbs6ZA==
 
-"@wharfkit/abicache@^1.2.0":
+"@wharfkit/abicache@^1.2.0", "@wharfkit/abicache@^1.2.1":
   version "1.2.2"
   resolved "https://registry.npmjs.org/@wharfkit/abicache/-/abicache-1.2.2.tgz"
   integrity sha512-yOsYz2qQpQy7Nb8XZj62pZqp8YnmWDqFlrenYksBb9jl+1aWIpFhWd+14VEez4tUAezRH4UWW+w1SX5vhmUY9A==
@@ -180,9 +180,9 @@
     pako "^2.0.4"
     tslib "^2.1.0"
 
-"@wharfkit/account@^1.0.0":
+"@wharfkit/account@^1.0.0", "@wharfkit/account@^1.1.1":
   version "1.1.1"
-  resolved "https://registry.npmjs.org/@wharfkit/account/-/account-1.1.1.tgz"
+  resolved "https://registry.yarnpkg.com/@wharfkit/account/-/account-1.1.1.tgz#44c6a33afe07001ae44009ac59e3492d830396dd"
   integrity sha512-487SJwAR1hw80Xz5EJTSnBAwME1fHa35obIoStH1k/fXp8MsBgvnM1/xvCS/LNC7N7fFCIUeaYO4Qv4SitM5Fw==
   dependencies:
     "@wharfkit/antelope" "^1.0.7"
@@ -231,6 +231,19 @@
     js-big-decimal "^2.0.7"
     tslib "^2.1.0"
 
+"@wharfkit/session@^1.3.1":
+  version "1.3.1"
+  resolved "https://registry.yarnpkg.com/@wharfkit/session/-/session-1.3.1.tgz#2cbfa14aafc21abba060e97dab24e9263c78ad6e"
+  integrity sha512-x+SV14arfhvuiDGyWAH2WIKW7v2WKQ1njc3EzU5ZzE6xVWRfKZ23mqtz83YemQ2h0562+QR712CzX5ZhAcdcpg==
+  dependencies:
+    "@wharfkit/abicache" "^1.2.1"
+    "@wharfkit/account" "^1.0.0"
+    "@wharfkit/antelope" "^1.0.2"
+    "@wharfkit/common" "^1.2.0"
+    "@wharfkit/signing-request" "^3.1.0"
+    pako "^2.0.4"
+    tslib "^2.1.0"
+
 "@wharfkit/signing-request@^3.1.0":
   version "3.2.0"
   resolved "https://registry.npmjs.org/@wharfkit/signing-request/-/signing-request-3.2.0.tgz"
@@ -247,6 +260,13 @@
     "@wharfkit/antelope" "^1.0.4"
     "@wharfkit/contract" "^1.1.4"
     bn.js "^4.11.9"
+    tslib "^2.1.0"
+
+"@wharfkit/wallet-plugin-privatekey@^1.1.0":
+  version "1.1.0"
+  resolved "https://registry.yarnpkg.com/@wharfkit/wallet-plugin-privatekey/-/wallet-plugin-privatekey-1.1.0.tgz#5985bff61895c54d2afbef359cd42da4f3871c7d"
+  integrity sha512-45LPj7AOVDm4RugDEhy0fnQX/BcMffeJPjGUCUrLazJ2S0Sti8nNk4nqiJqyme84c/0gq7d65vvwlmVfGtPVEg==
+  dependencies:
     tslib "^2.1.0"
 
 abbrev@1:
