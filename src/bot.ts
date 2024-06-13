@@ -797,7 +797,7 @@ bot.on("callback_query", async (callbackQuery: CallbackQuery) => {
         const ramPrice = await getEosRamPrice();
        bot.sendMessage(
          chatId!,
-         `RAM Price:${ramPrice} EOS/kb \n\n Enter RAM order details in the format: \n\n&lt;receiver&gt;,&lt;ram_amount(EOS or bytes)&lt;,&lt;price_per_kb(EOS)&lt;\n\n<b>Example (Click to Copy):</b>\n1.<code>replace_account,1024bytes,0.01</code>\n2.<code>replace_account,1kb,0.01</code>\n3.<code>replace_account,1mb,0.01</code>\n4.<code>replace_account,1gb,0.01</code>`,
+         `RAM Price:${ramPrice} EOS/kb \n\n Enter RAM order details in the format: \n\n&lt;receiver&gt;,&lt;ram_amount(EOS or bytes)&gt;,&lt;price_per_kb(EOS)&gt;\n\n<b>Example (Click to Copy):</b>\n1.<code>replace_account,1024bytes,0.01</code>\n2.<code>replace_account,1kb,0.01</code>\n3.<code>replace_account,1mb,0.01</code>\n4.<code>replace_account,1gb,0.01</code>`,
          { parse_mode: "HTML" }
        );
         bot.once("message", async (msg: Message) => {
