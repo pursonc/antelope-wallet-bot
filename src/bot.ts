@@ -612,7 +612,7 @@ bot.on("callback_query", async (callbackQuery: CallbackQuery) => {
       case "transfer_eos":
         bot.sendMessage(
           chatId!,
-          "Enter Addresses with Amounts and memo(optional). The address and amount are separated by commas.\n\n&lt;receiver&gt;,&lt;amount&gt;,&lt;memo&gt;\n\n<b>Example (Click to Copy):</b>\n1.<code>big.one,0.001</code>\n2.<code>aus1genereos,1,ThisIsTheMemo</code>\n3.<code>newdex.bp,3.45,This_is_The_memo</code>\n<i>(_ will be replaced with space)</i>",
+          "Enter Addresses with Amounts and memo(optional). The address and amount are separated by commas.\n\n&lt;receiver&gt;,&lt;amount&gt;,&lt;memo&gt;\n\n<b>Example (Click to Copy):</b>\n1.<code>replace_account,0.001</code>\n2.<code>replace_account,1,ThisIsTheMemo</code>\n3.<code>replace_account,3.45,This_is_The_memo</code>\n<i>(_ will be replaced with space)</i>",
           { parse_mode: "HTML" }
         );
         bot.once("message", async (msg: Message) => {
@@ -681,7 +681,7 @@ bot.on("callback_query", async (callbackQuery: CallbackQuery) => {
         const eosRamPrice = await getEosRamPrice();
         bot.sendMessage(
           chatId!,
-          `RAM price: ${eosRamPrice} EOS/kb\n\nEnter Addresses with Amounts (supports bytes or EOS amount)\nThe address and amount are separated by commas.\n\n&lt;receiver&gt;,&lt;ram_bytes&gt; or &lt;ram_of_eos_price&gt;\n\n<b>Example (Click to Copy):</b>\n1.<code>big.one,1024bytes</code>\n2.<code>wharfkit1112,1.2kb</code>\n3.<code>wharfkit1112,1mb</code>\n4.<code>wharfkit1112,2.1gb</code>\n5.<code>aus1genereos,1EOS</code>\n6.<code>newdex.bp,3.45EOS</code>`,
+          `RAM price: ${eosRamPrice} EOS/kb\n\nEnter Addresses with Amounts (supports bytes or EOS amount)\nThe address and amount are separated by commas.\n\n&lt;receiver&gt;,&lt;ram_bytes&gt; or &lt;ram_of_eos_price&gt;\n\n<b>Example (Click to Copy):</b>\n1.<code>replace_account,1024bytes</code>\n2.<code>replace_account,1.2kb</code>\n3.<code>replace_account,1mb</code>\n4.<code>replace_account,2.1gb</code>\n5.<code>replace_account,1EOS</code>\n6.<code>replace_account,3.45EOS</code>`,
           { parse_mode: "HTML" }
         );
         bot.once("message", async (msg: Message) => {
@@ -797,7 +797,7 @@ bot.on("callback_query", async (callbackQuery: CallbackQuery) => {
         const ramPrice = await getEosRamPrice();
        bot.sendMessage(
          chatId!,
-         `RAM Price:${ramPrice} EOS/kb \n\n Enter RAM order details in the format: \n\naccount_name,ram_amount(EOS or bytes),price_per_kb(EOS)\n\n<b>Example (Click to Copy):</b>\n1.<code>myaccount,1024bytes,0.01</code>\n2.<code>myaccount,1kb,0.01</code>\n3.<code>myaccount,1mb,0.01</code>\n4.<code>myaccount,1gb,0.01</code>`,
+         `RAM Price:${ramPrice} EOS/kb \n\n Enter RAM order details in the format: \n\n&lt;receiver&gt;,&lt;ram_amount(EOS or bytes)&lt;,&lt;price_per_kb(EOS)&lt;\n\n<b>Example (Click to Copy):</b>\n1.<code>replace_account,1024bytes,0.01</code>\n2.<code>replace_account,1kb,0.01</code>\n3.<code>replace_account,1mb,0.01</code>\n4.<code>replace_account,1gb,0.01</code>`,
          { parse_mode: "HTML" }
        );
         bot.once("message", async (msg: Message) => {
