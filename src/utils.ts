@@ -87,8 +87,8 @@ export async function getEosPrice(): Promise<number> {
 
   if (data.price) {
     price = parseFloat(data.price);
-  } else if (data.result?.XXBTZEUR?.c?.[0]) {
-    price = parseFloat(data.result.XXBTZEUR.c[0]);
+  } else if (data.result?.EOSUSDT?.c?.[0]) {
+    price = parseFloat(data.result.EOSUSDT.c[0]);
   } else if (data.data?.amount) {
     price = parseFloat(data.data.amount);
   } else {
