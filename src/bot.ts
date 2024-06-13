@@ -211,7 +211,7 @@ bot.on("callback_query", async (callbackQuery: CallbackQuery) => {
           }
         } else {
           const order = await getQuery(
-            "SELECT eos_account_name FROM account_orders WHERE user_id = ?",
+            "SELECT eos_account_name FROM account_orders WHERE user_id = ? AND activated = 0",
             [userId]
           );
           if (order) {
@@ -376,7 +376,7 @@ bot.on("callback_query", async (callbackQuery: CallbackQuery) => {
 
       case "activate_account":
         const order = await getQuery(
-          "SELECT eos_account_name, eos_public_key, eos_private_key FROM account_orders WHERE user_id = ?",
+          "SELECT eos_account_name, eos_public_key, eos_private_key FROM account_orders WHERE user_id = ? AND activated = 0",
           [userId]
         );
         if (order) {
@@ -395,9 +395,10 @@ bot.on("callback_query", async (callbackQuery: CallbackQuery) => {
                 userId,
               ]
             );
-            await runQuery("DELETE FROM account_orders WHERE user_id = ?", [
-              userId,
-            ]);
+            await runQuery(
+              "UPDATE account_orders SET activated = 1 WHERE order_id = ?",
+              [order.order_id]
+            );
 
             bot.sendMessage(
               chatId!,
@@ -435,9 +436,10 @@ bot.on("callback_query", async (callbackQuery: CallbackQuery) => {
         break;
 
       case "delete_order":
-        await runQuery("DELETE FROM account_orders WHERE user_id = ?", [
-          userId,
-        ]);
+        await runQuery(
+          "DELETE FROM account_orders WHERE user_id = ? AND activated = 0",
+          [userId]
+        );
         bot.sendMessage(chatId!, "Your account order has been deleted.", {
           reply_markup: {
             inline_keyboard: [
@@ -448,7 +450,7 @@ bot.on("callback_query", async (callbackQuery: CallbackQuery) => {
         break;
       case "view_order":
         const orderDetails = await getQuery(
-          "SELECT eos_account_name, eos_public_key FROM account_orders WHERE user_id = ?",
+          "SELECT eos_account_name, eos_public_key FROM account_orders WHERE user_id = ? AND activated = 0",
           [userId]
         );
         if (orderDetails) {
@@ -579,7 +581,7 @@ bot.on("callback_query", async (callbackQuery: CallbackQuery) => {
         break;
       case "order_status":
         const order_book = await getQuery(
-          "SELECT eos_account_name FROM account_orders WHERE user_id = ?",
+          "SELECT eos_account_name FROM account_orders WHERE user_id = ? AND activated = 0",
           [userId]
         );
 
