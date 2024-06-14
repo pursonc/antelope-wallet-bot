@@ -4,10 +4,8 @@ import { WalletPluginPrivateKey } from "@wharfkit/wallet-plugin-privatekey";
 import crypto from "crypto";
 import { runQuery, getQuery } from "./db";
 import {selectFastestEndpoint } from "./utils";
-import { fork } from "child_process";
-import path from "path";
-import { RAMLimitOrderMessage } from "./types";
-
+import { RAMLimitOrderResultMessage, RAMLimitOrderMessage } from "./types";
+import net from "net";
 
 // Ensure the createClient function uses node-fetch
 async function createClient() {
@@ -361,34 +359,48 @@ export async function buyRam(
   return result;
 }
 
-process.setMaxListeners(20);
+ // Create a TCP server
+const server = net.createServer((socket) => {
+  socket.on("data", async (data) => {
+    const message: RAMLimitOrderMessage = JSON.parse(data.toString());
 
-// Fork the child process for RAM order processing
-const ramOrderProcessor = fork(path.join(__dirname, 'ramOrderProcessor.js'));
+    if (message.type === "buyRamBytes") {
+      const { userId, recipient, bytes, orderId } = message;
+       try {
+        
+         const result = await buyRamBytes(userId, recipient, bytes);
 
-// Handle messages from the RAM order processor
-ramOrderProcessor.on("message", async (message: RAMLimitOrderMessage) => {
-  console.log("Received message from RAM order processor:", message)
-  if (message.type === "buyRamBytes") {
-    const { userId, recipient, bytes, orderId } = message;
-   
-    try {
-       const result = await buyRamBytes(userId, recipient, bytes);
+         const response: RAMLimitOrderResultMessage = {
+           type: "buyRamBytesResult",
+           result,
+           orderId,
+         };
 
-       ramOrderProcessor.send({ type: "buyRamBytesResult", result, orderId });
+         socket.write(JSON.stringify(response));
 
-    } catch (error: unknown) {
+       } catch (error: unknown) {
+         let failureReason = "Unknown error";
+         if (error instanceof Error) {
+           failureReason = error.message;
+         }
+         await runQuery(
+           "UPDATE ram_orders SET order_status = 'failed', trigger_date = datetime('now'), failure_reason = ? WHERE order_id = ?",
+           [failureReason, orderId]
+         );
+       }
 
-      let failureReason = "Unknown error";
-      if (error instanceof Error) {
-        failureReason = error.message;
-      }
-      await runQuery(
-        "UPDATE ram_orders SET order_status = 'failed', trigger_date = datetime('now'), failure_reason = ? WHERE order_id = ?",
-        [failureReason, orderId]
-      );
+      
     }
+  });
 
-    
-  }
+  socket.on("error", (err) => {
+    console.error("Socket error:", err);
+  });
 });
+
+server.listen(9527, () => {
+  console.log("EOS server is listening on port 9527");
+});
+
+
+ 

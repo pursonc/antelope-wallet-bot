@@ -1,21 +1,34 @@
 import { getEosRamPrice} from "./utils";
 import { runQuery  } from "./db";
+import net from "net";
+import { RAMLimitOrderMessage } from "./types";
 
-import { RAMLimitOrderResultMessage } from "./types";
 
-
+// Function to process RAM orders
 async function processRamOrders() {
-  process.on("message", async (message: RAMLimitOrderResultMessage) => {
-    if (message.type === "buyRamBytesResult") {
-      console.log(`Received buyRamBytes result:`, message.result);
-               
-      const transactionId = message.result.resolved?.transaction.id;
-      await runQuery(
-        "UPDATE ram_orders SET order_status = 'success', trigger_date = datetime('now'), transaction_id = ? WHERE order_id = ?",
-        [transactionId, message.orderId]
-      );
-    }
+  const client = new net.Socket();
+
+  client.connect(9527, "localhost", () => {
+    console.log("Connected to EOS server");
+
+    client.on("data", async (data) => {
+      const message = JSON.parse(data.toString());
+      if (message.type === "buyRamBytesResult") {
+        console.log(`Received buyRamBytes result:`, message.result);
+
+        const transactionId = message.result.resolved?.transaction.id;
+        await runQuery(
+          "UPDATE ram_orders SET order_status = 'success', trigger_date = datetime('now'), transaction_id = ? WHERE order_id = ?",
+          [transactionId, message.orderId]
+        );
+      }
+    });
+
+    client.on("error", (err) => {
+      console.error("Client connection error:", err);
+    });
   });
+
   try {
     const eosRamPrice = await getEosRamPrice();
 
@@ -25,17 +38,15 @@ async function processRamOrders() {
     );
 
     for (const order of orders) {
-        if (process.send) {
-        process.send({
-          type: "buyRamBytes",
-          userId: order.user_id,
-          recipient: order.eos_account_name,
-          bytes: order.ram_bytes,
-        });
-      } else {
-        console.error("process.send is undefined. Cannot send message.");
-      }
-       
+      const message: RAMLimitOrderMessage = {
+        type: "buyRamBytes",
+        userId: order.user_id,
+        recipient: order.eos_account_name,
+        bytes: order.ram_bytes,
+        orderId: order.order_id,
+      };
+
+      client.write(JSON.stringify(message));
     }
   } catch (error) {
     console.error("Error checking RAM prices:", error);
