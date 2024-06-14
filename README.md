@@ -1,4 +1,4 @@
-# EOS MOMMMY BOT
+# EOS WALLET BOT
 The current private key encryption scheme is very weak and only suitable for small-capital testing. Welcome to submit PR.
 
 
