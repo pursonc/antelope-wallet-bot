@@ -20,3 +20,5 @@ build/
 .DS_Store
 
 user_data.db
+
+.vscode/

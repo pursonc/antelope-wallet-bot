@@ -1,12 +1,6 @@
 # EOS WALLET BOT
 The current private key encryption scheme is very weak and only suitable for small-capital testing. Welcome to submit PR.
 
-
-## 1. Apply the telegram bot key from https://t.me/BotFather
-
-
-## 2. Set up Node.js Enviroment
-
 Nodejs v20.11.0
 
 
