@@ -1,17 +1,24 @@
 # EOS WALLET BOT
-The current private key encryption scheme is very weak and only suitable for small-capital testing. Welcome to submit PR.
+### The current private key encryption scheme is very weak and only suitable for small-capital testing. Welcome to submit PR.
+
+![overview](images/bot-overview.png)
 
 Nodejs v20.11.0
 
 
-## 1. Apply the telegram bot key from https://t.me/BotFather
+## 1. Apply the telegram bot key from [@BotFather](https://t.me/BotFather)
 
 
 ## 2. Set up Node.js Enviroment
 
 Nodejs v20.11.0
 
+## 3. Apply [stripe](https://stripe.com) and bind provider in [@BotFather](https://t.me/BotFather) (optional)
 
+more infomation about telegram payment : https://core.telegram.org/bots/payments
+![payment](images/payments.png)
+
+## 4. Start the bot
 ```
 yarn
  
@@ -28,7 +35,7 @@ https://t.me/eos_mommmy_bot
 ```
 
 
-## 3. account create contract
+## 5. account create contract
 
 https://github.com/cppfuns/signdappplay
 

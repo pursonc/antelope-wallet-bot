@@ -23,18 +23,26 @@ import {
   handleAuthorizeUser,
   handleConfirmAuthorization,
   handleDeleteAccountOrders,
+  handlePaymentFailure,
+  handlePaymentSuccess,
+  handleStripePayment
 } from "./handlers";
 
 
 // Load environment variables
 dotenv.config();
 
-const BOT_TOKEN = process.env.YOUR_TELEGRAM_BOT_TOKEN;
+const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 if (!BOT_TOKEN) {
   throw new Error("No Telegram Bot Token found in environment variables");
 }
+const PROVIDER_TOKEN = process.env.STRIPE_PROVIDER_TOKEN;
+if (!PROVIDER_TOKEN) {
+  throw new Error("No Stripe provider token from BotFather");
+}
 
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
+
 
 bot.onText(/\/start/, handleStart);
 
@@ -129,6 +137,10 @@ bot.on("callback_query", async (callbackQuery: CallbackQuery) => {
         await handleClearRAMOrders(callbackQuery);
         break;
 
+      case "pay_for_account":
+        await handleStripePayment(callbackQuery, PROVIDER_TOKEN, BOT_TOKEN);
+        break;
+
       default:
         if (
           callbackQuery.data &&
@@ -152,6 +164,17 @@ bot.on("polling_error", (error) => {
       bot.startPolling(); // Restart polling
     }, 5000); // Retry after 5 seconds
   }
+});
+bot.on("pre_checkout_query", (query) => {
+  bot.answerPreCheckoutQuery(query.id, true);
+});
+
+bot.on("successful_payment", async (msg: any) => {
+  await handlePaymentSuccess(msg.successful_payment.invoice_payload);
+});
+
+bot.on("payment_failed", async (msg) => {
+  await handlePaymentFailure(msg.failed_payment.invoice_payload);
 });
 
 export default bot;

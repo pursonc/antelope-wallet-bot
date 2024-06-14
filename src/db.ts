@@ -82,6 +82,27 @@ db.run(
   }
 );
 
+db.run(
+  `
+  CREATE TABLE IF NOT EXISTS payments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER,
+  amount INTEGER,
+  status TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY(user_id) REFERENCES users(user_id)
+);
+
+  `,
+  (err) => {
+    if (err) {
+      console.error("Error creating table:", err.message);
+    } else {
+      console.log("Payments table created or already exists.");
+    }
+  }
+);
+
 
 // Function to get multiple rows
 export function runQuery(query: string, params: any[] = []): Promise<any> {

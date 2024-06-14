@@ -20,6 +20,9 @@ export {
     handleClearRAMOrders,
     handleAuthorizeUser,
     handleConfirmAuthorization,
-    handleDeleteAccountOrders
+    handleDeleteAccountOrders,
+    handlePaymentFailure,
+    handlePaymentSuccess,
+    handleStripePayment
  } from "./callbackQueryHandler";
 

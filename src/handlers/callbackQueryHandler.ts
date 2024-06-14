@@ -7,6 +7,7 @@ import {
   checkEosAccountExists,
   sendWalletOptions,
   getEosRamPrice,
+  getEosPrice,
 } from "../utils";
 import {
   importEosAccount,
@@ -21,6 +22,7 @@ import {
   getSessionExpirationTime,
   getSessionPrivateKey,
   isSessionActive,
+
 } from "../eos";
 import {
   WALLET_MENU_NO_ACCOUNT,
@@ -28,6 +30,7 @@ import {
   START_MENU,
 } from "../menu";
 import bot from "../bot";
+
 
 export async function handleSelectAccount(callbackQuery: CallbackQuery) {
   const userId = callbackQuery.from.id;
@@ -270,6 +273,19 @@ export async function handleWallets(callbackQuery: CallbackQuery) {
       ];
     } else {
       inlineKeyboard = WALLET_MENU_NO_ACCOUNT;
+       
+        const hasViewRAMOrders = inlineKeyboard.some((row) =>
+          row.some((button) => button.callback_data === "pay_for_account")
+        );
+        if (!hasViewRAMOrders) {
+          inlineKeyboard.unshift([
+            {
+              text: "💳 Create Account (Payments)",
+              callback_data: "pay_for_account",
+            },
+          ]);
+        }
+      
     }
 
     bot.editMessageText(message, {
@@ -1151,4 +1167,93 @@ export async function handleClearRAMOrders(callbackQuery: CallbackQuery) {
       inline_keyboard: [[{ text: "↔️ Wallet", callback_data: "wallets" }]],
     },
   });
+}
+
+
+export async function handleStripePayment(callbackQuery: CallbackQuery, provider_token: string, telegram_bot_token: string) {
+  const chatId = callbackQuery.message?.chat.id!;
+  const userId = callbackQuery.from.id;
+
+  try {
+    const eosPrice = await getEosPrice();
+    const amount = Math.ceil(
+      eosPrice * Number(process.env.EOS_ACCOUNT_PRICE) )* 100
+     // Convert to cents and round up
+
+    const invoice = {
+      chat_id: chatId,
+      title: "New EOS Account",
+      description: "Payment for services creating a new EOS account",
+      payload: JSON.stringify({ userId, amount }), // Payload to identify the payment
+      provider_token,
+      start_parameter: "start",
+      currency: "USD",
+      prices: [{ label: "USD", amount }],
+      max_tip_amount: 500,
+      suggested_tip_amounts: [100, 200, 300, 500],
+      photo_url:
+        "https://static-btcfx.oss-ap-southeast-1.aliyuncs.com/invoice-cartoon.png",
+      photo_width: 512,
+      photo_height: 512,
+      need_name: false,
+      need_phone_number: false,
+      need_email: false,
+      need_shipping_address: false,
+      send_phone_number_to_provider: false,
+      send_email_to_provider: false,
+      is_flexible: false,
+    };
+
+    const response = await fetch(
+      `https://api.telegram.org/bot${telegram_bot_token}/sendInvoice`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(invoice),
+      }
+    );
+    
+
+    const result = await response.json();
+    if (!result.ok) {
+      throw new Error(result.description);
+    }
+
+    // Save the invoice in the database
+    await runQuery(
+      "INSERT INTO payments (user_id, amount, status) VALUES (?, ?, ?)",
+      [userId, amount, "pending"]
+    );
+  } catch (error) {
+    console.error("Error creating invoice:", error);
+    bot.sendMessage(chatId, "Failed to create invoice. Please try again.");
+  }
+}
+
+
+
+export async function handlePaymentSuccess(payload: string) {
+  const payment = JSON.parse(payload);
+  const { userId, amount } = payment;
+
+  await runQuery(
+    "UPDATE payments SET status = 'succeeded' WHERE user_id = ? AND amount = ?",
+    [userId, amount]
+  );
+
+  bot.sendMessage(userId, "Your payment was successful! Thank you.");
+}
+
+export async function handlePaymentFailure(payload: string) {
+  const payment = JSON.parse(payload);
+  const { userId, amount } = payment;
+
+  await runQuery(
+    "UPDATE payments SET status = 'failed' WHERE user_id = ? AND amount = ?",
+    [userId, amount]
+  );
+
+  bot.sendMessage(userId, "Your payment failed. Please try again.");
 }
