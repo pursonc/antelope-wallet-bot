@@ -7,6 +7,7 @@ import {checkEosAccountExists, getEosRamPrice, selectFastestEndpoint } from "./u
 import { RAMLimitOrderResultMessage, RAMLimitOrderMessage } from "./types";
 import net from "net";
 const PORT = 9527;
+
 // Ensure the createClient function uses node-fetch
 async function createClient() {
   const fastestEndpoint = await selectFastestEndpoint();
@@ -520,7 +521,8 @@ export async function buyRam(
   return result;
 }
 
- // Create a TCP server
+ 
+// Create a TCP server for RAM limit order
 const server = net.createServer((socket) => {
   socket.on("data", async (data) => {
     const message: RAMLimitOrderMessage = JSON.parse(data.toString());
@@ -549,8 +551,6 @@ const server = net.createServer((socket) => {
            [failureReason, orderId]
          );
        }
-
-      
     }
   });
 
@@ -560,9 +560,10 @@ const server = net.createServer((socket) => {
   });
 });
 
-server.listen(PORT, () => {
-  console.log("EOS server is listening on port " + PORT);
+server.listen(PORT, "0.0.0.0",() => {
+  console.log("EOS socket is listening on port " + PORT);
 });
+
 
 
  

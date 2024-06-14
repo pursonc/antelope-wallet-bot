@@ -23,7 +23,6 @@ import {
   getSessionPrivateKey,
   isSessionActive,
   createEosAccount,
-
 } from "../eos";
 import {
   WALLET_MENU_NO_ACCOUNT,
@@ -1484,7 +1483,8 @@ try {
 
 
   const paymentInfo = await response.json();
-
+    console.log("paymentInfo", paymentInfo)
+    
   // Check payment status
   if (paymentInfo.status === "Paid") {
      await runQuery(

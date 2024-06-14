@@ -29,6 +29,7 @@ import {
 } from "./handlers";
 
 
+
 // Load environment variables
 dotenv.config();
 
@@ -184,5 +185,6 @@ bot.on("successful_payment", async (msg: any) => {
 bot.on("payment_failed", async (msg) => {
   await handlePaymentFailure(msg.failed_payment.invoice_payload);
 });
+
 
 export default bot;

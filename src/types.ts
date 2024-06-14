@@ -12,4 +12,14 @@ export type RAMLimitOrderResultMessage = {
   orderId: number;
 };
 
+export type xaPayCallbackMessage = {
+  type: "0xaPayCallback";
+  userId: number;
+};
+
+export type xaPayCallbackResultMessage = {
+  type: "0xaPayCallbackResult";
+  result: any;
+};
+
 export const PAYMENT_TYPES = ["credit", "crypto"];
