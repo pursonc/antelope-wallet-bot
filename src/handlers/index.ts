@@ -9,6 +9,7 @@ export {
     handleAccountOrders,
     handleActivateAccount,
     handleDeleteAccount,
+    handleConfirmDeleteAccount,
     handleViewAccountOrders,
     handleProfile,
     handleTransferEOS,

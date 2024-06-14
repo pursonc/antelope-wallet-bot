@@ -1,4 +1,4 @@
-import TelegramBot, { Message, CallbackQuery } from "node-telegram-bot-api";
+import TelegramBot, { CallbackQuery } from "node-telegram-bot-api";
 import dotenv from "dotenv";
 import {
   handleStart,
@@ -19,6 +19,7 @@ import {
   handleRAMOrder,
   handleViewRAMOrders,
   handleClearRAMOrders,
+  handleConfirmDeleteAccount,
 } from "./handlers";
 
 
@@ -46,67 +47,71 @@ bot.on("callback_query", async (callbackQuery: CallbackQuery) => {
   try {
     switch (callbackQuery.data) {
       case "wallets":
-         await handleWallets(callbackQuery);
+        await handleWallets(callbackQuery);
         break;
 
       case "import_account":
-         await handleImportAccount(callbackQuery);
+        await handleImportAccount(callbackQuery);
         break;
 
       case "create_account_contract":
-         await handleCreateAccountContract(callbackQuery);
+        await handleCreateAccountContract(callbackQuery);
         break;
 
       case "orders":
-         await handleAccountOrders(callbackQuery);
+        await handleAccountOrders(callbackQuery);
         break;
 
       case "activate_account":
-         await handleActivateAccount(callbackQuery);
+        await handleActivateAccount(callbackQuery);
         break;
 
       case "delete_order":
-         await handleDeleteAccount(callbackQuery);
+        await handleDeleteAccount(callbackQuery);
         break;
 
       case "view_order":
-         await handleViewAccountOrders(callbackQuery);
+        await handleViewAccountOrders(callbackQuery);
         break;
 
       case "profile":
-         await handleProfile(callbackQuery); 
+        await handleProfile(callbackQuery);
         break;
 
       case "order_status":
-         await handleAccountOrderStatus(callbackQuery);
+        await handleAccountOrderStatus(callbackQuery);
         break;
 
       case "transfer_eos":
-         await handleTransferEOS(callbackQuery);
+        await handleTransferEOS(callbackQuery);
         break;
 
       case "buy_ram":
-         await handleBuyRAM(callbackQuery);
+        await handleBuyRAM(callbackQuery);
         break;
 
       case "delete":
-         await handleDeleteAccount(callbackQuery);
+        await handleDeleteAccount(callbackQuery);
+        break;
+
+      case "confirm_delete_account":
+        await handleConfirmDeleteAccount(callbackQuery);
         break;
 
       case "close":
-         await handleClose(callbackQuery);
+        await handleClose(callbackQuery);
         break;
 
       case "ram_order":
-         await handleRAMOrder(callbackQuery);
+        await handleRAMOrder(callbackQuery);
         break;
 
       case "view_ram_orders":
-         await handleViewRAMOrders(callbackQuery);
+        await handleViewRAMOrders(callbackQuery);
         break;
 
       case "clear_ram_orders":
-         await handleClearRAMOrders(callbackQuery);
+        await handleClearRAMOrders(callbackQuery);
         break;
 
       default:

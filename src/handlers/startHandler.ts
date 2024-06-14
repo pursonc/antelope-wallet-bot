@@ -1,7 +1,7 @@
 import { Message } from "node-telegram-bot-api";
-import { runQuery, getQuery } from "../db";
+import { runQuery } from "../db";
 import { isAllowed } from "../rateLimiter";
-import { getEosPrice, getEosRamPrice, sendWalletOptions } from "../utils";
+import { getEosPrice, getEosRamPrice } from "../utils";
 import { START_MENU } from "../menu";
 import bot from "../bot";
 

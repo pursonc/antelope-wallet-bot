@@ -718,21 +718,38 @@ export async function handleBuyRAM(callbackQuery: CallbackQuery) {
 }
 
 export async function handleDeleteAccount(callbackQuery: CallbackQuery) {
-  const userId = callbackQuery.from.id;
   const chatId = callbackQuery.message?.chat.id;
-  await runQuery(
-    "UPDATE users SET eos_account_name = NULL, eos_public_key = NULL, eos_private_key = NULL, permission_name = NULL WHERE user_id = ?",
-    [userId]
-  );
-  await runQuery("DELETE from ram_orders WHERE user_id = ?", [userId]);
-  bot.editMessageText("Your EOS account information has been deleted.", {
-    chat_id: chatId,
-    message_id: callbackQuery.message?.message_id,
-    reply_markup: {
-      inline_keyboard: [[{ text: "❌ Close", callback_data: "close" }]],
-    },
-  });
+
+    bot.editMessageText("Are you sure you want to delete your EOS account?", {
+      chat_id: chatId,
+      message_id: callbackQuery.message?.message_id,
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "Yes, delete", callback_data: "confirm_delete_account" }],
+          [{ text: "No, go back", callback_data: "wallets" }],
+        ],
+      },
+    });
+  
 }
+
+export async function handleConfirmDeleteAccount(callbackQuery: CallbackQuery) {
+     const userId = callbackQuery.from.id;
+     const chatId = callbackQuery.message?.chat.id;
+    await runQuery(
+      "UPDATE users SET eos_account_name = NULL, eos_public_key = NULL, eos_private_key = NULL, permission_name = NULL WHERE user_id = ?",
+      [userId]
+    );
+
+    bot.editMessageText("Your EOS account information has been deleted.", {
+      chat_id: chatId,
+      message_id: callbackQuery.message?.message_id,
+      reply_markup: {
+        inline_keyboard: [[{ text: "❌ Close", callback_data: "close" }]],
+      },
+    });
+}
+
 export async function handleClose(callbackQuery: CallbackQuery) {
   const chatId = callbackQuery.message?.chat.id;
   try {
