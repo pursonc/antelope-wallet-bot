@@ -1,10 +1,34 @@
 import { getEosRamPrice} from "./utils";
 import { runQuery  } from "./db";
-import { buyRamBytes } from "./eos";
+import net from "net";
+import { RAMLimitOrderMessage } from "./types";
 
 
+// Function to process RAM orders
 async function processRamOrders() {
-  console.log("Checking RAM orders...");
+  const client = new net.Socket();
+
+  client.connect(9527, "localhost", () => {
+    console.log("Connected to EOS server");
+
+    client.on("data", async (data) => {
+      const message = JSON.parse(data.toString());
+      if (message.type === "buyRamBytesResult") {
+        console.log(`Received buyRamBytes result:`, message.result);
+
+        const transactionId = message.result.resolved?.transaction.id;
+        await runQuery(
+          "UPDATE ram_orders SET order_status = 'success', trigger_date = datetime('now'), transaction_id = ? WHERE order_id = ?",
+          [transactionId, message.orderId]
+        );
+      }
+    });
+
+    client.on("error", (err) => {
+      console.error("Client connection error:", err);
+    });
+  });
+
   try {
     const eosRamPrice = await getEosRamPrice();
 
@@ -14,28 +38,15 @@ async function processRamOrders() {
     );
 
     for (const order of orders) {
-      try {
-        const result = await buyRamBytes(
-          order.user_id,
-          order.eos_account_name,
-          order.ram_bytes
-        );
-        console.log(result.resolved?.transaction.id);
-        const transactionId = result.resolved?.transaction.id;
-        await runQuery(
-          "UPDATE ram_orders SET order_status = 'success', trigger_date = datetime('now'), transaction_id = ? WHERE order_id = ?",
-          [transactionId, order.order_id]
-        );
-      } catch (error: unknown) {
-        let failureReason = "Unknown error";
-        if (error instanceof Error) {
-          failureReason = error.message;
-        }
-        await runQuery(
-          "UPDATE ram_orders SET order_status = 'failed', trigger_date = datetime('now'), failure_reason = ? WHERE order_id = ?",
-          [failureReason, order.order_id]
-        );
-      }
+      const message: RAMLimitOrderMessage = {
+        type: "buyRamBytes",
+        userId: order.user_id,
+        recipient: order.eos_account_name,
+        bytes: order.ram_bytes,
+        orderId: order.order_id,
+      };
+
+      client.write(JSON.stringify(message));
     }
   } catch (error) {
     console.error("Error checking RAM prices:", error);

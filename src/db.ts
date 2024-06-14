@@ -20,7 +20,9 @@ db.run(
         eos_account_name TEXT,
         eos_public_key TEXT,
         eos_private_key TEXT,
-        permission_name TEXT
+        permission_name TEXT,
+        session_password TEXT,
+        session_expiration INTEGER
     )
 `,
   (err) => {
