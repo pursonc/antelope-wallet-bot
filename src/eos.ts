@@ -6,7 +6,7 @@ import { runQuery, getQuery } from "./db";
 import {checkEosAccountExists, getEosRamPrice, selectFastestEndpoint } from "./utils";
 import { RAMLimitOrderResultMessage, RAMLimitOrderMessage } from "./types";
 import net from "net";
-
+const PORT = 9527;
 // Ensure the createClient function uses node-fetch
 async function createClient() {
   const fastestEndpoint = await selectFastestEndpoint();
@@ -555,14 +555,13 @@ const server = net.createServer((socket) => {
   });
 
 
-
   socket.on("error", (err) => {
     console.error("Socket error:", err);
   });
 });
 
-server.listen(9527, () => {
-  console.log("EOS server is listening on port 9527");
+server.listen(PORT, () => {
+  console.log("EOS server is listening on port " + PORT);
 });
 
 

@@ -38,7 +38,11 @@ if (!BOT_TOKEN) {
 }
 const PROVIDER_TOKEN = process.env.PAYMENT_PROVIDER_TOKEN;
 if (!PROVIDER_TOKEN) {
-  throw new Error("No Stripe provider token from BotFather");
+  console.log("No Stripe provider token from BotFather");
+}
+const XAPAY_API_KEY = process.env.XAPAY_API_KEY;
+if (!XAPAY_API_KEY) {
+  console.log("No 0xaPay token ");
 }
 
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
@@ -137,7 +141,11 @@ bot.on("callback_query", async (callbackQuery: CallbackQuery) => {
         await handleClearRAMOrders(callbackQuery);
         break;
 
-      case "pay_for_account":
+      case "pay_for_account_by_card":
+        await handleStripePayment(callbackQuery, PROVIDER_TOKEN, BOT_TOKEN);
+        break;
+
+      case "pay_for_account_by_crypto":
         await handleStripePayment(callbackQuery, PROVIDER_TOKEN, BOT_TOKEN);
         break;
 

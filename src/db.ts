@@ -92,6 +92,8 @@ db.run(
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   chat_id INTEGER,
   type TEXT,
+  pay_link TEXT,
+  track_id TEXT,
   FOREIGN KEY(user_id) REFERENCES users(user_id)
 );
 
