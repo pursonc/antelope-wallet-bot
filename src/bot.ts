@@ -20,6 +20,8 @@ import {
   handleViewRAMOrders,
   handleClearRAMOrders,
   handleConfirmDeleteAccount,
+  handleAuthorizeUser,
+  handleConfirmAuthorization,
 } from "./handlers";
 
 
@@ -37,6 +39,7 @@ bot.onText(/\/start/, handleStart);
 
 bot.on("callback_query", async (callbackQuery: CallbackQuery) => {
   const chatId = callbackQuery.message?.chat.id;
+  const userId = callbackQuery.from.id;
   if (callbackQuery.data && callbackQuery.data.startsWith("select_account:")) {
      await handleSelectAccount(callbackQuery);
   }
@@ -44,6 +47,17 @@ bot.on("callback_query", async (callbackQuery: CallbackQuery) => {
   if (callbackQuery.data && callbackQuery.data.startsWith("view_ram_orders:")) {
      await handleRAMOrderPage(callbackQuery);
   }
+
+  if (callbackQuery.data && callbackQuery.data?.startsWith("authorize:")) {
+    await handleConfirmAuthorization(callbackQuery);
+    return;
+  }
+
+  if (callbackQuery.data === "authorize_user") {
+    await handleAuthorizeUser(callbackQuery);
+    return;
+  }
+
   try {
     switch (callbackQuery.data) {
       case "wallets":

@@ -17,6 +17,8 @@ export {
     handleClose,
     handleRAMOrder,
     handleViewRAMOrders,
-    handleClearRAMOrders
+    handleClearRAMOrders,
+    handleAuthorizeUser,
+    handleConfirmAuthorization,
  } from "./callbackQueryHandler";
 

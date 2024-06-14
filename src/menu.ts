@@ -6,6 +6,12 @@ export const START_MENU = [
 
 
 export const WALLET_MENU_WITH_ACCOUNT = [
+  [
+    {
+      text: "🔑Session Key(Authorize Exec Limit Order)",
+      callback_data: "authorize_user",
+    },
+  ],
   [{ text: "💠 Buy RAM", callback_data: "buy_ram" }],
   [{ text: "⏳ Create Buy RAM Limit Order", callback_data: "ram_order" }],
   [{ text: "💸 Transfer EOS", callback_data: "transfer_eos" }],

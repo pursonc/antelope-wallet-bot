@@ -17,6 +17,10 @@ import {
   buyRamBytes,
   generateEosKeyPair,
   encrypt,
+  authorizeUser,
+  getSessionExpirationTime,
+  getSessionPrivateKey,
+  isSessionActive,
 } from "../eos";
 import {
   WALLET_MENU_NO_ACCOUNT,
@@ -139,15 +143,12 @@ export async function handleWallets(callbackQuery: CallbackQuery) {
   const chatId = callbackQuery.message?.chat.id;
 
   const user = await getQuery(
-    "SELECT eos_account_name, eos_public_key, eos_private_key FROM users WHERE user_id = ?",
+    "SELECT eos_account_name, eos_public_key, eos_private_key, session_expiration FROM users WHERE user_id = ?",
     [userId]
   );
+
   let message = "Please Create Account or Import Account.";
-  let inlineKeyboard;
-  const ramOrders = await runQuery(
-    "SELECT * FROM ram_orders WHERE user_id = ?",
-    [userId]
-  );
+  let inlineKeyboard: { text: string; callback_data: string }[][] = [];
 
   if (
     user &&
@@ -155,25 +156,72 @@ export async function handleWallets(callbackQuery: CallbackQuery) {
     user.eos_public_key &&
     user.eos_private_key
   ) {
-    const { eos_account_name, eos_public_key, eos_private_key } = user;
-    const privateKey = decrypt(eos_private_key, userId);
-    const eosBalance = await getEosBalance(eos_account_name);
-    message = `🔹 Account Name: <code>${eos_account_name}</code>\n🔹 Public Key: <code>${eos_public_key}</code>\n🔹 Private Key(backup 1st): <span class="tg-spoiler">${privateKey}</span>\n🔹 Balance: ${eosBalance} EOS`;
+    const {
+      eos_account_name,
+      eos_public_key,
+      eos_private_key,
+      session_expiration,
+    } = user;
 
-    inlineKeyboard = WALLET_MENU_WITH_ACCOUNT;
-    if (ramOrders && ramOrders.length > 0) {
-      const existingRamOrdersButton = inlineKeyboard.find(
-        (button) => button[0].callback_data === "view_ram_orders"
-      );
-      if (!existingRamOrdersButton) {
-        inlineKeyboard.unshift([
-          { text: "📜 My RAM Limit Orders", callback_data: "view_ram_orders" },
-        ]);
+    const sessionExpirationTime = await getSessionExpirationTime(userId);
+    const {days, hours, minutes, timestamp} = sessionExpirationTime;
+
+    // console.log("sessionExpirationTime", sessionExpirationTime);
+
+    const currentTime = Math.floor(new Date().getTime() / 1000); // Current time in seconds
+    const privateKey = await getSessionPrivateKey(userId);
+    if (session_expiration && timestamp > currentTime && privateKey) {
+      // Session is still valid, no need to unlock
+      const eosBalance = await getEosBalance(eos_account_name);
+
+      message = `🔹 Account Name: <code>${eos_account_name}</code>\n🔹 Public Key: <code>${eos_public_key}</code>\n🔹 Private Key(Plz Backup❗️): <span class="tg-spoiler">${privateKey}</span>\n🔹 Balance: ${eosBalance} EOS\n`;
+      if (days || hours || minutes) {
+        message += `🔹 Session Expire in ${days && `${days} days`} ${
+          hours && `${hours} hours`
+        } ${minutes && `${minutes} minutes`}`;
       }
+      inlineKeyboard = WALLET_MENU_WITH_ACCOUNT;
+
+      bot.editMessageText(message, {
+        chat_id: chatId,
+        message_id: callbackQuery.message?.message_id,
+        parse_mode: "HTML",
+        reply_markup: {
+          inline_keyboard: inlineKeyboard,
+        },
+      });
+    } else {
+      // Session expired or not set, ask for password to unlock
+      
+      bot.sendMessage(
+        chatId!,
+        "🔐Please enter your password to unlock:"
+      );
+      bot.once("message", async (msg: Message) => {
+        const password = msg.text!;
+
+        const decryptedPrivateKey = decrypt(eos_private_key, password);
+        if (!decryptedPrivateKey) {
+          message = "🙅 Incorrect password. Please try again.";
+          inlineKeyboard = START_MENU;
+        } else {
+          const eosBalance = await getEosBalance(eos_account_name);
+          await authorizeUser(userId, password, 1);
+          message = `<b>Unlock Wallet then buy RAM or transfer. </b>\n\n🔹 Account Name: <code>${eos_account_name}</code>\n🔹 Public Key: <code>${eos_public_key}</code>\n🔹 Private Key(Plz Backup❗️): <span class="tg-spoiler">${decryptedPrivateKey}</span>\n🔹 Balance: ${eosBalance} EOS\n`;
+          inlineKeyboard = WALLET_MENU_WITH_ACCOUNT;
+        }
+
+        bot.sendMessage(chatId!, message, {
+          parse_mode: "HTML",
+          reply_markup: {
+            inline_keyboard: inlineKeyboard,
+          },
+        });
+      });
     }
   } else {
     const order = await getQuery(
-      "SELECT eos_account_name FROM account_orders WHERE user_id = ? AND activated = 0",
+      "SELECT eos_account_name FROM account_orders WHERE user_id = ?",
       [userId]
     );
     if (order) {
@@ -185,120 +233,160 @@ export async function handleWallets(callbackQuery: CallbackQuery) {
     } else {
       inlineKeyboard = WALLET_MENU_NO_ACCOUNT;
     }
-  }
 
-  bot.editMessageText(message, {
-    chat_id: chatId,
-    message_id: callbackQuery.message?.message_id,
-    parse_mode: "HTML",
-    reply_markup: {
-      inline_keyboard: inlineKeyboard,
-    },
-  });
+    bot.editMessageText(message, {
+      chat_id: chatId,
+      message_id: callbackQuery.message?.message_id,
+      parse_mode: "HTML",
+      reply_markup: {
+        inline_keyboard: inlineKeyboard,
+      },
+    });
+  }
 }
+
+
 
 export async function handleImportAccount(callbackQuery: CallbackQuery) {
   const chatId = callbackQuery.message?.chat.id;
-  bot.sendMessage(chatId!, "Please enter your EOS private key:");
+
+  bot.sendMessage(chatId!, "🔑Please enter your EOS private key:");
   bot.once("message", async (msg: Message) => {
     const chatId = msg.chat.id;
     const userId = msg.from!.id;
+
     if (!msg.text) {
-      bot.sendMessage(chatId!, "Please provide your EOS private key.");
+      bot.sendMessage(chatId, "Please provide your EOS private key.");
       return;
     }
-    try {
-      const { publicKey, encryptedPrivateKey, accounts } =
-        await importEosAccount(msg.text, userId);
+    const eosPrivateKey = msg.text;
 
-      if (accounts.length === 1) {
-        const { accountName, permissionName } = accounts[0];
-        // console.log(accountName);
-        await runQuery(
-          "UPDATE users SET eos_account_name = ?, eos_public_key = ?, eos_private_key = ?, permission_name = ? WHERE user_id = ?",
-          [
-            `${accountName}`,
-            publicKey,
-            encryptedPrivateKey,
-            `${permissionName}`,
-            userId,
-          ]
-        );
-
+    bot.sendMessage(
+      chatId,
+      "🔐Please enter an encryption password(>= 8 characters):"
+    );
+    bot.once("message", async (msg: Message) => {
+      const password = msg.text;
+      if (!password || password.length < 8) {
         bot.sendMessage(
-          chatId!,
-          `Account imported successfully.\n\n🔹 EOS Account Name: ${accountName}\n🔹 EOS Public Key: ${publicKey}\n🔹 Permission: ${permissionName}`,
-          {
-            reply_markup: {
-              inline_keyboard: START_MENU,
-            },
-          }
+          chatId,
+          "Invalid password. Please provide an encryption password.(>= 8 characters)"
         );
-      } else {
-        await runQuery(
-          "UPDATE users SET eos_account_name = ?, eos_public_key = ?, eos_private_key = ?, permission_name = ? WHERE user_id = ?",
-          ["-", publicKey, encryptedPrivateKey, "-", userId]
-        );
-        const inlineKeyboard = accounts.map((account) => [
-          {
-            text: `${account.accountName} (${account.permissionName})`,
-            callback_data: `select_account:${account.accountName}:${account.permissionName}`,
-          },
-        ]);
+         
+      }
 
-        bot.sendMessage(
-          chatId!,
-          "Multiple accounts found. Please select one:",
-          {
-            reply_markup: {
-              inline_keyboard: inlineKeyboard,
+      try {
+        const { publicKey, encryptedPrivateKey, accounts } =
+          await importEosAccount(eosPrivateKey, password!);
+
+        if (accounts.length === 1) {
+          const { accountName, permissionName } = accounts[0];
+
+          await runQuery(
+            "UPDATE users SET eos_account_name = ?, eos_public_key = ?, eos_private_key = ?, permission_name = ? WHERE user_id = ?",
+            [
+              `${accountName}`,
+              publicKey,
+              encryptedPrivateKey,
+              `${permissionName}`,
+              userId,
+            ]
+          );
+
+          bot.sendMessage(
+            chatId,
+            `Account imported successfully.\n\n🔹 EOS Account Name: ${accountName}\n🔹 EOS Public Key: ${publicKey}\n🔹 Permission: ${permissionName}`,
+            {
+              reply_markup: {
+                inline_keyboard: START_MENU,
+              },
+            }
+          );
+        } else {
+          await runQuery(
+            "UPDATE users SET eos_account_name = ?, eos_public_key = ?, eos_private_key = ?, permission_name = ? WHERE user_id = ?",
+            ["-", publicKey, encryptedPrivateKey, "-", userId]
+          );
+          const inlineKeyboard = accounts.map((account) => [
+            {
+              text: `${account.accountName} (${account.permissionName})`,
+              callback_data: `select_account:${account.accountName}:${account.permissionName}`,
             },
-          }
-        );
+          ]);
+
+          bot.sendMessage(
+            chatId,
+            "Multiple accounts found. Please select one:",
+            {
+              reply_markup: {
+                inline_keyboard: inlineKeyboard,
+              },
+            }
+          );
+        }
+      } catch (error: unknown) {
+        let errorMessage = "Unknown error";
+        if (error instanceof Error) {
+          errorMessage = error.message;
+        }
+        bot.sendMessage(chatId, `Error importing EOS account: ${errorMessage}`);
+        sendWalletOptions(bot, chatId, "Returning to wallet options...");
       }
-    } catch (error: unknown) {
-      let errorMessage = "Unknown error";
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      }
-      bot.sendMessage(chatId!, `Error importing EOS account: ${errorMessage}`);
-      sendWalletOptions(bot, chatId!, "Returning to wallet options...");
-    }
+    });
   });
 }
 
 export async function handleCreateAccountContract(
   callbackQuery: CallbackQuery
 ) {
-  const userId = callbackQuery.from.id;
   const chatId = callbackQuery.message?.chat.id;
-  const eosAccountName = await generateEosAccountName();
-  const accountExists = await checkEosAccountExists(eosAccountName);
+  const userId = callbackQuery.from.id;
 
-  if (accountExists) {
-    bot.sendMessage(
-      chatId!,
-      "Generated account already exists. Please try again."
-    );
-    return;
-  }
-
-  const { privateKey, publicKey } = generateEosKeyPair();
-  await runQuery(
-    "INSERT INTO account_orders (user_id, eos_account_name, eos_public_key, eos_private_key) VALUES (?, ?, ?, ?)",
-    [userId, eosAccountName, publicKey, encrypt(privateKey, userId)]
+  // Ask user for a password to encrypt the private key
+  bot.sendMessage(
+    chatId!,
+    "🔐Please enter a password to encrypt your private key(>= 8 characters):"
   );
 
-  const contractMessage = `<b>EOS Account Order</b>\n\nCreate Account Name: <code>${eosAccountName}</code>\n\nCreation Steps:\n1. Transfer 4 EOS to the following account: \n\n <code>signupeoseos</code> \n\n with the memo: \n<code>${eosAccountName}-${publicKey}</code>\n\n2. After transfer is complete, wait for 1 minute and then click the activation button below.\n\n⚠️ Note: The bot does not charge any fee during the creation process. If the account creation fails and leads to asset loss, The bot cannot help you recover assets.\n\nPlease complete the registration order as soon as possible. Once the account name is taken, the EOS cannot be refunded.`;
+  bot.once("message", async (msg) => {
+    const password = msg.text;
 
-  bot.sendMessage(chatId!, contractMessage, {
-    parse_mode: "HTML",
-    reply_markup: {
-      inline_keyboard: [
-        [{ text: "Activate", callback_data: "activate_account" }],
-        [{ text: "↔️ Wallet", callback_data: "wallets" }],
-      ],
-    },
+    try {
+      const eosAccountName = await generateEosAccountName();
+      const accountExists = await checkEosAccountExists(eosAccountName);
+
+      if (accountExists) {
+        bot.sendMessage(
+          chatId!,
+          "Generated account already exists. Please try again."
+        );
+        return;
+      }
+
+      const { privateKey, publicKey } = generateEosKeyPair();
+      await runQuery(
+        "INSERT INTO account_orders (user_id, eos_account_name, eos_public_key, eos_private_key) VALUES (?, ?, ?, ?)",
+        [userId, eosAccountName, publicKey, encrypt(privateKey, password!)]
+      );
+
+      const contractMessage = `<b>EOS Account Order</b>\n\nCreate Account Name: <code>${eosAccountName}</code>\n\nCreation Steps:\n1. Transfer 4 EOS to the following account: \n\n <code>signupeoseos</code> \n\n with the memo: \n<code>${eosAccountName}-${publicKey}</code>\n\n2. After transfer is complete, wait for 1 minute and then click the activation button below.\n\n⚠️ Note: The bot does not charge any fee during the creation process. If the account creation fails and leads to asset loss, the bot cannot help you recover assets.\n\nPlease complete the registration order as soon as possible. Once the account name is taken, the EOS cannot be refunded.`;
+
+      bot.sendMessage(chatId!, contractMessage, {
+        parse_mode: "HTML",
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "Activate", callback_data: "activate_account" }],
+            [{ text: "↔️ Wallet", callback_data: "wallets" }],
+          ],
+        },
+      });
+    } catch (error) {
+      let errorMessage = "Unknown error";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      bot.sendMessage(chatId!, `Error creating EOS account: ${errorMessage}`);
+    }
   });
 }
 
@@ -388,6 +476,88 @@ export async function handleActivateAccount(callbackQuery: CallbackQuery) {
         inline_keyboard: [[{ text: "↔️ Wallet", callback_data: "wallets" }]],
       },
     });
+  }
+}
+
+export async function handleAuthorizeUser(callbackQuery: CallbackQuery) {
+  const chatId = callbackQuery.message?.chat.id;
+  const userId = callbackQuery.from.id;
+
+  bot.sendMessage(
+    chatId!,
+    "⚠️The bot will be authorized to execute some transactions with your private key temporarily. Such as executing the limit order. \n\n🔐Please enter your password to authorize:"
+  );
+
+  bot.once("message", async (msg) => {
+    const password = msg.text;
+
+    const user = await getQuery(
+      "SELECT eos_private_key FROM users WHERE user_id = ?",
+      [userId]
+    );
+
+    if (user) {
+      const decryptedPrivateKey = decrypt(user.eos_private_key, password!);
+      if (!decryptedPrivateKey) {
+        bot.sendMessage(chatId!, "🙅 Incorrect password. Please try again.", {
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "↔️ Wallet", callback_data: "wallets" }],
+            ],
+          },
+        });
+      } else {
+        bot.sendMessage(chatId!, "Select authorization duration:", {
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: "1 hour", callback_data: `authorize:1:${password}` },
+                { text: "6 hours", callback_data: `authorize:6:${password}` },
+                { text: "12 hours", callback_data: `authorize:12:${password}` },
+              ],
+              [
+                { text: "1 day", callback_data: `authorize:24:${password}` },
+                { text: "3 days", callback_data: `authorize:72:${password}` },
+                { text: "7 days", callback_data: `authorize:168:${password}` },
+              ],
+            ],
+          },
+        });
+      }
+    } else {
+      bot.sendMessage(chatId!, "No account found for authorization.", {
+        reply_markup: {
+          inline_keyboard: [[{ text: "↔️ Wallet", callback_data: "wallets" }]],
+        },
+      });
+    }
+  });
+}
+
+
+export async function handleConfirmAuthorization(callbackQuery: CallbackQuery) {
+  const [_, duration, password] = callbackQuery.data!.split(":");
+  const userId = callbackQuery.from.id;
+  try {
+    await authorizeUser(userId, password, Number(duration));
+    bot.sendMessage(
+      callbackQuery.message!.chat.id,
+      `✅Authorized for ${duration} hour(s).`,
+      {
+        reply_markup: {
+          inline_keyboard: [[{ text: "↔️ Wallet", callback_data: "wallets" }]],
+        },
+      }
+    );
+  } catch (error: unknown) {
+    let errorMessage = "Unknown error";
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    }
+    bot.sendMessage(
+      callbackQuery.message!.chat.id,
+      `Error authorizing user: ${errorMessage}`
+    );
   }
 }
 
@@ -523,7 +693,10 @@ export async function handleProfile(callbackQuery: CallbackQuery) {
       message_id: callbackQuery.message?.message_id,
       parse_mode: "HTML",
       reply_markup: {
-        inline_keyboard: [[{ text: "❌ Close", callback_data: "close" }]],
+        inline_keyboard: [
+          [{ text: "⬅️ Return wallets list", callback_data: "wallets" }],
+          [{ text: "❌ Close", callback_data: "close" }],
+        ],
       },
     });
   } else {
@@ -572,12 +745,35 @@ export async function handleAccountOrderStatus(callbackQuery: CallbackQuery) {
 
 export async function handleTransferEOS(callbackQuery: CallbackQuery) {
   const chatId = callbackQuery.message?.chat.id;
+  const userId = callbackQuery.from.id;
+  const isUnlock = await isSessionActive(userId);
+
+    if (!isUnlock) {
+      bot.editMessageText("Unlock Wallet to Transfer. ", {
+        chat_id: chatId,
+        message_id: callbackQuery.message?.message_id,
+        reply_markup: {
+          inline_keyboard: [[{ text: "↔️ Wallet", callback_data: "wallets" }]],
+        },
+      });
+      return;
+    }
+const message = `
+Enter Addresses with Amounts and memo(optional). The address and amount are separated by commas.\n\n
+&lt;receiver&gt;, &lt;amount&gt;, &lt;memo&gt;\n\n
+<b>Example (Click to Copy):</b>\n
+1. <code>replace_account,0.001</code>\n
+2. <code>replace_account,1,ThisIsTheMemo</code>\n
+3. <code>replace_account,3.45,This_is_The_memo</code>\n
+("_" will be replaced with space)
+`;
+
   bot.sendMessage(
     chatId!,
-    "Enter Addresses with Amounts and memo(optional). The address and amount are separated by commas.\n\n&lt;receiver&gt;,&lt;amount&gt;,&lt;memo&gt;\n\n<b>Example (Click to Copy):</b>\n1.<code>replace_account,0.001</code>\n2.<code>replace_account,1,ThisIsTheMemo</code>\n3.<code>replace_account,3.45,This_is_The_memo</code>\n<i>(_ will be replaced with space)</i>",
+    message,
     { parse_mode: "HTML" }
   );
-  bot.once("message", async (msg: Message) => {
+  bot.once("message", async (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from!.id;
 
@@ -635,6 +831,21 @@ export async function handleTransferEOS(callbackQuery: CallbackQuery) {
 export async function handleBuyRAM(callbackQuery: CallbackQuery) {
   const chatId = callbackQuery.message?.chat.id;
   const eosRamPrice = await getEosRamPrice();
+  const userId = callbackQuery.from.id;
+  const isUnlock = await isSessionActive(userId);
+
+
+  if (!isUnlock) {
+     bot.editMessageText("Unlock Wallet then buy RAM. ", {
+       chat_id: chatId,
+       message_id: callbackQuery.message?.message_id,
+       reply_markup: {
+         inline_keyboard: [[{ text: "↔️ Wallet", callback_data: "wallets" }]],
+       },
+     });
+     return;
+  }
+
   bot.sendMessage(
     chatId!,
     `RAM price: ${eosRamPrice} EOS/kb\n\nEnter Addresses with Amounts (supports bytes or EOS amount)\nThe address and amount are separated by commas.\n\n&lt;receiver&gt;,&lt;ram_bytes&gt; or &lt;ram_of_eos_price&gt;\n\n<b>Example (Click to Copy):</b>\n1.<code>replace_account,1024bytes</code>\n2.<code>replace_account,1.2kb</code>\n3.<code>replace_account,1mb</code>\n4.<code>replace_account,2.1gb</code>\n5.<code>replace_account,1EOS</code>\n6.<code>replace_account,3.45EOS</code>`,
@@ -766,9 +977,22 @@ export async function handleClose(callbackQuery: CallbackQuery) {
 export async function handleRAMOrder(callbackQuery: CallbackQuery) {
   const chatId = callbackQuery.message?.chat.id;
   const ramPrice = await getEosRamPrice();
+  const userId = callbackQuery.from.id;
+  const isUnlock = await isSessionActive(userId);
+
+  if (!isUnlock) {
+    bot.editMessageText("Unlock Wallet then buy RAM. ", {
+      chat_id: chatId,
+      message_id: callbackQuery.message?.message_id,
+      reply_markup: {
+        inline_keyboard: [[{ text: "↔️ Wallet", callback_data: "wallets" }]],
+      },
+    });
+    return;
+  }
   bot.sendMessage(
     chatId!,
-    `RAM Price:${ramPrice} EOS/kb \n\n Enter RAM order details in the format: \n\n&lt;receiver&gt;,&lt;ram_amount(EOS or bytes)&gt;,&lt;price_per_kb(EOS)&gt;\n\n<b>Example (Click to Copy):</b>\n1.<code>replace_account,1024bytes,0.01</code>\n2.<code>replace_account,1kb,0.01</code>\n3.<code>replace_account,1mb,0.01</code>\n4.<code>replace_account,1gb,0.01</code>`,
+    `RAM Price:${ramPrice} EOS/kb \n\nPlease make sure to create a Session Key that is long enough on the wallet page.\n\n Enter RAM order details in the format: \n\n&lt;receiver&gt;,&lt;ram_amount(EOS or bytes)&gt;,&lt;price_per_kb(EOS)&gt;\n\n<b>Example (Click to Copy):</b>\n1.<code>replace_account,1024bytes,0.01</code>\n2.<code>replace_account,1kb,0.01</code>\n3.<code>replace_account,1mb,0.01</code>\n4.<code>replace_account,1gb,0.01</code>`,
     { parse_mode: "HTML" }
   );
   bot.once("message", async (msg: Message) => {
