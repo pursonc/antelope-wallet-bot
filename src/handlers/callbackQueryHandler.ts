@@ -1415,7 +1415,8 @@ const eosPrice = await getEosPrice();
     callback_url: `${process.env.XAPAY_CALLBACK_URL}/oxaPayCallback?userId=${userId}`,
     returnUrl: `https://t.me/eos_wallet_bot`, // Redirect to your Telegram bot after successful payment
   };
-
+ 
+  console.log("callbackurl", paymentRequest.callback_url)
   const response = await fetch("https://api.oxapay.com/merchants/request", {
     method: "POST",
     headers: {
@@ -1432,19 +1433,23 @@ const eosPrice = await getEosPrice();
     "INSERT INTO payments (user_id, amount, status, chat_id, type, track_id, pay_link) VALUES (?, ?, ?, ?, ?, ?, ?)",
     [userId, invoiceAmount, `${result}-${message}`, chatId, PAYMENT_TYPES[1], trackId, payLink]
   );
+  
 
+ 
   if (result == 100) {
-    bot.sendMessage(
-      chatId,
-      `Please complete your payment by clicking the link below:\n${paymentData.payLink}`,
-      {
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: "Complete Payment", url: paymentData.payLink }],
-          ],
-        },
-      }
-    );
+     bot.editMessageText(
+       `Please complete your payment by clicking the link below:\n${paymentData.payLink}`,
+       {
+         chat_id: chatId,
+         message_id: callbackQuery.message?.message_id,
+         reply_markup: {
+           inline_keyboard: [
+             [{ text: "Complete Payment", url: paymentData.payLink }],
+           ],
+         },
+       }
+     );
+    
   } else {
     bot.sendMessage(
       chatId,
@@ -1458,103 +1463,81 @@ const eosPrice = await getEosPrice();
   }
 }
 
-export async function handleOxaPayPaymentSuccess(userId: number, merchant: string) {
+export async function handleOxaPayPaymentSuccess(userId: number, merchant?: string) {
 
 try {
 
   const payments = await runQuery(
-    "SELECT track_id FROM payments WHERE user_id = ? AND status != 'succeeded'",
+    "SELECT track_id FROM payments WHERE user_id = ?",
     [userId]
   );
-  if (!payments) {
-
-  }
-  // Query payment information using the trackId
-  const response = await fetch(`https://api.oxapay.com/merchants/inquiry`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      merchant: merchant || "sandbox",
-      trackId: payments.track_id,
-    }),
-  });
-
-
-  const paymentInfo = await response.json();
-    console.log("paymentInfo", paymentInfo)
     
   // Check payment status
-  if (paymentInfo.status === "Paid") {
-     await runQuery(
-       "UPDATE payments SET status = 'succeeded' WHERE user_id = ? ",
-       [userId]
-     );
+  if (payments[0].status === "succeeded") {
 
-     bot.sendMessage(
-       userId,
-       `Payment successful! Please enter an 8-character or longer password to create your EOS account:`
-     );
+    bot.sendMessage(
+      userId,
+      `Payment successful! Please enter an 8-character or longer password to create your EOS account:`
+    );
 
-     bot.once("message", async (msg: Message) => {
-       const password = msg.text;
+    bot.once("message", async (msg: Message) => {
+      const password = msg.text;
 
-       if (password && password.length >= 8) {
-         try {
-           const result = await createEosAccount(
-             userId,
-             password,
-             Number(process.env.EOS_ACCOUNT_PRICE)!
-           );
-           bot.sendMessage(
-             userId,
-             `Account create successfully!\nTransaction ID: https://bloks.io/transaction/${result.resolved?.transaction.id}`,
-             {
-               parse_mode: "HTML",
-               reply_markup: {
-                 inline_keyboard: [
-                   [
-                     {
-                       text: "⬅️ Return wallets list",
-                       callback_data: "wallets",
-                     },
-                   ],
-                 ],
-               },
-             }
-           );
-         } catch (error: unknown) {
-           let errorMessage = "Unknown error";
-           if (error instanceof Error) {
-             errorMessage = error.message;
-           }
-           bot.sendMessage(
-             userId!,
-             `Error create EOS account: ${errorMessage}`,
-             {
-               parse_mode: "HTML",
-               reply_markup: {
-                 inline_keyboard: [
-                   [
-                     {
-                       text: "⬅️ Return wallets list",
-                       callback_data: "wallets",
-                     },
-                   ],
-                 ],
-               },
-             }
-           );
-         }
-       } else {
-         bot.sendMessage(
-           userId,
-           "Password must be at least 8 characters long. Please try again."
-         );
-         passwordInvalidRetryCreateAccount(msg, userId, 1);
-       }
-     });
+      if (password && password.length >= 8) {
+        try {
+          const result = await createEosAccount(
+            userId,
+            password,
+            Number(process.env.EOS_ACCOUNT_PRICE)!
+          );
+          bot.sendMessage(
+            userId,
+            `Account create successfully!\nTransaction ID: https://bloks.io/transaction/${result.resolved?.transaction.id}`,
+            {
+              parse_mode: "HTML",
+              reply_markup: {
+                inline_keyboard: [
+                  [
+                    {
+                      text: "⬅️ Return wallets list",
+                      callback_data: "wallets",
+                    },
+                  ],
+                ],
+              },
+            }
+          );
+        } catch (error: unknown) {
+          let errorMessage = "Unknown error";
+          if (error instanceof Error) {
+            errorMessage = error.message;
+          }
+          bot.sendMessage(
+            userId!,
+            `Error create EOS account: ${errorMessage}`,
+            {
+              parse_mode: "HTML",
+              reply_markup: {
+                inline_keyboard: [
+                  [
+                    {
+                      text: "⬅️ Return wallets list",
+                      callback_data: "wallets",
+                    },
+                  ],
+                ],
+              },
+            }
+          );
+        }
+      } else {
+        bot.sendMessage(
+          userId,
+          "Password must be at least 8 characters long. Please try again."
+        );
+        passwordInvalidRetryCreateAccount(msg, userId, 1);
+      }
+    });
   } else {
     bot.sendMessage(
       userId,

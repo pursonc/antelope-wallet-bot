@@ -18,9 +18,8 @@ if (chatType === "group" || chatType === "supergroup") {
     chatId,
     "This bot does not support group operations. Please use the bot in a private chat."
   );
-} else {
-  bot.sendMessage(chatId, "Unsupported chat type.");
-}
+  return;
+}  
 
   try {
     await runQuery(

@@ -4,9 +4,7 @@ import { WalletPluginPrivateKey } from "@wharfkit/wallet-plugin-privatekey";
 import crypto from "crypto";
 import { runQuery, getQuery } from "./db";
 import {checkEosAccountExists, getEosRamPrice, selectFastestEndpoint } from "./utils";
-import { RAMLimitOrderResultMessage, RAMLimitOrderMessage } from "./types";
-import net from "net";
-const PORT = 9527;
+
 
 // Ensure the createClient function uses node-fetch
 async function createClient() {
@@ -361,7 +359,7 @@ export async function buyRam(
 }
 
   export async function createEosAccount(userId: number, password: string, eos_amount: number): Promise<any> {
-    
+
     let newAccountName = ""
        
     while (true) { 
@@ -522,70 +520,7 @@ export async function buyRam(
 }
 
  
-// Create a TCP server for RAM limit order
-const server = net.createServer((socket) => {
-  socket.on("data", async (data) => {
-    const message: RAMLimitOrderMessage = JSON.parse(data.toString());
 
-    if (message.type === "buyRamBytes") {
-      const { userId, recipient, bytes, orderId } = message;
-       try {
-        
-         const result = await buyRamBytes(userId, recipient, bytes);
-
-         const response: RAMLimitOrderResultMessage = {
-           type: "buyRamBytesResult",
-           result,
-           orderId,
-         };
-
-         socket.write(JSON.stringify(response));
-
-       } catch (error: unknown) {
-         let failureReason = "Unknown error";
-         if (error instanceof Error) {
-           failureReason = error.message;
-         }
-         await runQuery(
-           "UPDATE ram_orders SET order_status = 'failed', trigger_date = datetime('now'), failure_reason = ? WHERE order_id = ?",
-           [failureReason, orderId]
-         );
-       }
-    }
-    else if (message.type === "0xaPayCallback") {
-      const { userId } = message;
-      try {
-        const result = await buyRam(userId, recipient, amount);
-
-        const response: RAMLimitOrderResultMessage = {
-          type: "buyRamResult",
-          result,
-          orderId,
-        };
-
-        socket.write(JSON.stringify(response));
-      } catch (error: unknown) {
-        let failureReason = "Unknown error";
-        if (error instanceof Error) {
-          failureReason = error.message;
-        }
-        await runQuery(
-          "UPDATE ram_orders SET order_status = 'failed', trigger_date = datetime('now'), failure_reason = ? WHERE order_id = ?",
-          [failureReason, orderId]
-        );
-      }
-    }
-  });
-
-
-  socket.on("error", (err) => {
-    console.error("Socket error:", err);
-  });
-});
-
-server.listen(PORT, "0.0.0.0",() => {
-  console.log("EOS socket is listening on port " + PORT);
-});
 
 
 
