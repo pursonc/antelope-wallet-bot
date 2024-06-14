@@ -11,3 +11,5 @@ export type RAMLimitOrderResultMessage = {
   result: any;
   orderId: number;
 };
+
+export const PAYMENT_TYPES = ["credit", "crypto"];

@@ -22,6 +22,7 @@ import {
   getSessionExpirationTime,
   getSessionPrivateKey,
   isSessionActive,
+  createEosAccount,
 
 } from "../eos";
 import {
@@ -30,6 +31,7 @@ import {
   START_MENU,
 } from "../menu";
 import bot from "../bot";
+import { PAYMENT_TYPES } from "../types";
 
 
 export async function handleSelectAccount(callbackQuery: CallbackQuery) {
@@ -274,13 +276,13 @@ export async function handleWallets(callbackQuery: CallbackQuery) {
     } else {
       inlineKeyboard = WALLET_MENU_NO_ACCOUNT;
        
-        const hasViewRAMOrders = inlineKeyboard.some((row) =>
+        const hasCreateAccoutByCard = inlineKeyboard.some((row) =>
           row.some((button) => button.callback_data === "pay_for_account")
         );
-        if (!hasViewRAMOrders) {
+        if (!hasCreateAccoutByCard && process.env.PAYMENT_PROVIDER_TOKEN) {
           inlineKeyboard.unshift([
             {
-              text: "💳 Create Account (Payments)",
+              text: "💳 Create Account (Credit Card)",
               callback_data: "pay_for_account",
             },
           ]);
@@ -406,16 +408,15 @@ export async function handleCreateAccountContract(
     const password = msg.text;
 
     try {
-      const eosAccountName = await generateEosAccountName();
-      const accountExists = await checkEosAccountExists(eosAccountName);
+      let eosAccountName = "";
 
-      if (accountExists) {
-        bot.sendMessage(
-          chatId!,
-          "Generated account already exists. Please try again."
-        );
-        return;
-      }
+        while (true) {
+            eosAccountName = await generateEosAccountName();
+            let accountExists = await checkEosAccountExists(eosAccountName);
+            if (!accountExists) {
+                break;
+            }
+        }
 
       const { privateKey, publicKey } = generateEosKeyPair();
       await runQuery(
@@ -1223,8 +1224,8 @@ export async function handleStripePayment(callbackQuery: CallbackQuery, provider
 
     // Save the invoice in the database
     await runQuery(
-      "INSERT INTO payments (user_id, amount, status) VALUES (?, ?, ?)",
-      [userId, amount, "pending"]
+      "INSERT INTO payments (user_id, amount, status, chat_id, type) VALUES (?, ?, ?, ?, ?)",
+      [userId, amount, "pending", chatId, PAYMENT_TYPES[0]]
     );
   } catch (error) {
     console.error("Error creating invoice:", error);
@@ -1232,6 +1233,59 @@ export async function handleStripePayment(callbackQuery: CallbackQuery, provider
   }
 }
 
+function passwordInvalidRetryCreateAccount(msg: Message, userId: number,  count: number) {
+ if (count >= 2) {
+    bot.sendMessage(userId, "Create Account Fail. Please contract Admin.");
+    return;
+ }
+    // Listen for the password input
+  bot.once("message", async (msg: Message) => {
+    const password = msg.text;
+    // Validate the password length
+    if (password && password.length >= 8) {
+      try {
+        const result = await createEosAccount(
+        userId,
+        password,
+        Number(process.env.EOS_ACCOUNT_PRICE)!
+      );
+      bot.sendMessage(
+        userId,
+        `Account create successfully!\nTransaction ID: https://bloks.io/transaction/${result.resolved?.transaction.id}`,
+        {
+          parse_mode: "HTML",
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "⬅️ Return wallets list", callback_data: "wallets" }],
+            ],
+          },
+        }
+      );
+      } catch (error: unknown) {
+        let errorMessage = "Unknown error";
+        if (error instanceof Error) {
+            errorMessage = error.message;
+        }
+        bot.sendMessage(userId!, `Error create EOS account: ${errorMessage}`, {
+          parse_mode: "HTML",
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "⬅️ Return wallets list", callback_data: "wallets" }],
+            ],
+          },
+        });
+        
+}
+        
+    } else {
+      bot.sendMessage(
+        userId,
+        "Password must be at least 8 characters long. Please try again."
+      );
+        passwordInvalidRetryCreateAccount(msg, userId,  count + 1);
+    }
+ });
+}
 
 
 export async function handlePaymentSuccess(payload: string) {
@@ -1243,7 +1297,71 @@ export async function handlePaymentSuccess(payload: string) {
     [userId, amount]
   );
 
-  bot.sendMessage(userId, "Your payment was successful! Thank you.");
+  bot.sendMessage(
+    userId,
+    `Payment successful! Please enter an 8-character or longer password to create your EOS account:`
+  );
+  
+  // Listen for the password input
+  bot.once("message", async (msg: Message) => {
+    const password = msg.text;
+    // Validate the password length
+    if (password && password.length >= 8) {
+        try {
+          const result = await createEosAccount(
+            userId,
+            password,
+            Number(process.env.EOS_ACCOUNT_PRICE)!
+          );
+          bot.sendMessage(
+            userId,
+            `Account create successfully!\nTransaction ID: https://bloks.io/transaction/${result.resolved?.transaction.id}`,
+            {
+              parse_mode: "HTML",
+              reply_markup: {
+                inline_keyboard: [
+                  [
+                    {
+                      text: "⬅️ Return wallets list",
+                      callback_data: "wallets",
+                    },
+                  ],
+                ],
+              },
+            }
+          );
+        } catch (error: unknown) {
+          let errorMessage = "Unknown error";
+          if (error instanceof Error) {
+            errorMessage = error.message;
+          }
+          bot.sendMessage(
+            userId!,
+            `Error create EOS account: ${errorMessage}`,
+            {
+              parse_mode: "HTML",
+              reply_markup: {
+                inline_keyboard: [
+                  [
+                    {
+                      text: "⬅️ Return wallets list",
+                      callback_data: "wallets",
+                    },
+                  ],
+                ],
+              },
+            }
+          );
+        }
+      
+    } else {
+      bot.sendMessage(
+        userId,
+        "Password must be at least 8 characters long. Please try again."
+      );
+      passwordInvalidRetryCreateAccount(msg, userId,  1);
+    }
+  });
 }
 
 export async function handlePaymentFailure(payload: string) {

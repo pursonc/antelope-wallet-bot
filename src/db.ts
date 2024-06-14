@@ -90,6 +90,8 @@ db.run(
   amount INTEGER,
   status TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  chat_id INTEGER,
+  type TEXT,
   FOREIGN KEY(user_id) REFERENCES users(user_id)
 );
 

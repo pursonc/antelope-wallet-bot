@@ -18,6 +18,11 @@ Nodejs v20.11.0
 more infomation about telegram payment : https://core.telegram.org/bots/payments
 ![payment](images/payments.png)
 
+## 4. Apply [OxaPay](https://oxapay.com/) (optional)
+
+more infomation about telegram payment : https://core.telegram.org/bots/payments
+![payment](images/payments.png)
+
 ## 4. Start the bot
 ```
 yarn
@@ -33,12 +38,6 @@ yarn dev
 
 https://t.me/eos_mommmy_bot
 ```
-
-
-## 5. account create contract
-
-https://github.com/cppfuns/signdappplay
-
 
 ## Others
 

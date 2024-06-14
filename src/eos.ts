@@ -3,7 +3,7 @@ import { Session } from "@wharfkit/session";
 import { WalletPluginPrivateKey } from "@wharfkit/wallet-plugin-privatekey";
 import crypto from "crypto";
 import { runQuery, getQuery } from "./db";
-import {selectFastestEndpoint } from "./utils";
+import {checkEosAccountExists, getEosRamPrice, selectFastestEndpoint } from "./utils";
 import { RAMLimitOrderResultMessage, RAMLimitOrderMessage } from "./types";
 import net from "net";
 
@@ -359,6 +359,167 @@ export async function buyRam(
   return result;
 }
 
+  export async function createEosAccount(userId: number, password: string, eos_amount: number): Promise<any> {
+    
+    let newAccountName = ""
+       
+    while (true) { 
+      newAccountName = await generateEosAccountName();
+      let accountExists = await checkEosAccountExists(newAccountName);
+        if (!accountExists) {
+          break;
+        }
+    }
+
+    const keyPair = generateEosKeyPair();
+    const ramPrice = await getEosRamPrice();
+  
+
+    const creator = process.env.EOS_CREATOR_ACCOUNT;
+    const creatorPermission = process.env.EOS_CREATOR_ACCOUNT_PERMISSION;
+    const creatorPrivateKey = process.env.EOS_CREATOR_ACCOUNT_PRIVATE_KEY;
+
+    if(!creator || !creatorPermission || !creatorPrivateKey) {
+      throw new Error("EOS creator account not configured.");
+    }
+  
+    const session = new Session({
+      chain: {
+        id: "aca376f206b8fc25a6ed44dbdc66547c36c6c33e3a119ffbeaef943642f0e906",
+        url: "https://eos.greymass.com",
+      },
+      actor: creator,
+      permission: creatorPermission,
+      walletPlugin: new WalletPluginPrivateKey(creatorPrivateKey),
+    });
+  
+ 
+    const actions = [
+      {
+        account: "eosio",
+        name: "newaccount",
+        authorization: [
+          {
+            actor: creator,
+            permission: creatorPermission,
+          },
+        ],
+        data: {
+          creator: creator,
+          name: newAccountName,
+          owner: {
+            threshold: 1,
+            keys: [
+              {
+                key: keyPair.publicKey,
+                weight: 1,
+              },
+            ],
+            accounts: [],
+            waits: [],
+          },
+          active: {
+            threshold: 1,
+            keys: [
+              {
+                key: keyPair.publicKey,
+                weight: 1,
+              },
+            ],
+            accounts: [],
+            waits: [],
+          },
+        },
+      },
+      {
+        account: "eosio",
+        name: "buyrambytes",
+        authorization: [
+          {
+            actor: creator,
+            permission: creatorPermission,
+          },
+        ],
+        data: {
+          payer: creator,
+          receiver: newAccountName,
+          bytes: Math.floor((eos_amount - 1) * ramPrice * 1024),
+        },
+      },
+      {
+        account: "eosio",
+        name: "delegatebw",
+        authorization: [
+          {
+            actor: creator,
+            permission: creatorPermission,
+          },
+        ],
+        data: {
+          from: creator,
+          receiver: newAccountName,
+          stake_net_quantity: "0.1000 EOS", // Stake 0.1 EOS for NET
+          stake_cpu_quantity: "0.1000 EOS", // Stake 0.1 EOS for CPU
+          transfer: true,
+        },
+      },
+      {
+        account: "eosio",
+        name: "powerup",
+        authorization: [
+          {
+            actor: creator,
+            permission: creatorPermission,
+          },
+        ],
+        data: {
+          payer: creator,
+          receiver: creator,
+          days: 1,
+          net_frac: "87302", // Amount of NET fraction to power up
+          cpu_frac: "10000000000", // Amount of CPU fraction to power up
+          max_payment: "0.1000 EOS", // Maximum amount of EOS to pay for the power up
+        },
+      },
+      {
+        account: "eosio",
+        name: "powerup",
+        authorization: [
+          {
+            actor: creator,
+            permission: creatorPermission,
+          },
+        ],
+        data: {
+          payer: creator,
+          receiver: newAccountName,
+          days: 1,
+          net_frac: "87302", // Amount of NET fraction to power up
+          cpu_frac: "10000000000", // Amount of CPU fraction to power up
+          max_payment: "0.1000 EOS", // Maximum amount of EOS to pay for the power up
+        },
+      },
+    ];
+    const result = await session.transact(
+      {
+        actions,
+      },
+      { broadcast: true }
+    );
+    
+    await runQuery(
+      "UPDATE users SET eos_account_name = ?, eos_public_key = ?, eos_private_key = ? WHERE user_id = ?",
+      [
+        newAccountName,
+        keyPair.publicKey,
+        encrypt(keyPair.privateKey, password),
+        userId,
+      ]
+    );
+
+  return result;
+}
+
  // Create a TCP server
 const server = net.createServer((socket) => {
   socket.on("data", async (data) => {
@@ -392,6 +553,8 @@ const server = net.createServer((socket) => {
       
     }
   });
+
+
 
   socket.on("error", (err) => {
     console.error("Socket error:", err);

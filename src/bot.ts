@@ -36,7 +36,7 @@ const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 if (!BOT_TOKEN) {
   throw new Error("No Telegram Bot Token found in environment variables");
 }
-const PROVIDER_TOKEN = process.env.STRIPE_PROVIDER_TOKEN;
+const PROVIDER_TOKEN = process.env.PAYMENT_PROVIDER_TOKEN;
 if (!PROVIDER_TOKEN) {
   throw new Error("No Stripe provider token from BotFather");
 }
