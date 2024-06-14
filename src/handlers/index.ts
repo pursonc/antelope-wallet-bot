@@ -20,5 +20,6 @@ export {
     handleClearRAMOrders,
     handleAuthorizeUser,
     handleConfirmAuthorization,
+    handleDeleteAccountOrders
  } from "./callbackQueryHandler";
 

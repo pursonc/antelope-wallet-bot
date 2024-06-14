@@ -22,6 +22,7 @@ import {
   handleConfirmDeleteAccount,
   handleAuthorizeUser,
   handleConfirmAuthorization,
+  handleDeleteAccountOrders,
 } from "./handlers";
 
 
@@ -81,7 +82,7 @@ bot.on("callback_query", async (callbackQuery: CallbackQuery) => {
         break;
 
       case "delete_order":
-        await handleDeleteAccount(callbackQuery);
+        await handleDeleteAccountOrders(callbackQuery);
         break;
 
       case "view_order":

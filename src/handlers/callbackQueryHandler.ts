@@ -182,6 +182,23 @@ export async function handleWallets(callbackQuery: CallbackQuery) {
       }
       inlineKeyboard = WALLET_MENU_WITH_ACCOUNT;
 
+          const ramOrders = await runQuery(
+            "SELECT * FROM ram_orders WHERE user_id = ?",
+            [userId]
+          );
+          if (ramOrders) {
+            if (Array.isArray(ramOrders) && ramOrders.length > 0) {
+              const hasViewRAMOrders = inlineKeyboard.some((row) =>
+                row.some((button) => button.callback_data === "view_ram_orders")
+              );
+              if (!hasViewRAMOrders) {
+                inlineKeyboard.unshift([
+                  { text: "📜 RAM Orders", callback_data: "view_ram_orders" },
+                ]);
+              }
+            }
+          }
+
       bot.editMessageText(message, {
         chat_id: chatId,
         message_id: callbackQuery.message?.message_id,
@@ -210,6 +227,23 @@ export async function handleWallets(callbackQuery: CallbackQuery) {
           message = `<b>Unlock Wallet then buy RAM or transfer. </b>\n\n🔹 Account Name: <code>${eos_account_name}</code>\n🔹 Public Key: <code>${eos_public_key}</code>\n🔹 Private Key(Plz Backup❗️): <span class="tg-spoiler">${decryptedPrivateKey}</span>\n🔹 Balance: ${eosBalance} EOS\n`;
           inlineKeyboard = WALLET_MENU_WITH_ACCOUNT;
         }
+        const ramOrders = await runQuery(
+          "SELECT * FROM ram_orders WHERE user_id = ?",
+          [userId]
+        );
+        if (ramOrders) {
+          if (Array.isArray(ramOrders) && ramOrders.length > 0) {
+            const hasViewRAMOrders = inlineKeyboard.some(
+              (row) => row.some((button) => button.callback_data === "view_ram_orders")
+            );
+            if (!hasViewRAMOrders) {
+              inlineKeyboard.unshift([
+                { text: "📜 RAM Orders", callback_data: "view_ram_orders" },
+              ]);
+            }
+          }
+        }
+
 
         bot.sendMessage(chatId!, message, {
           parse_mode: "HTML",

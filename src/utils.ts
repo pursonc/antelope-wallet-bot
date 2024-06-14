@@ -211,3 +211,4 @@ export async function checkEosAccountExists(accountName: string): Promise<boolea
   const data = await response.json();
   return !!data.account_name;
 }
+

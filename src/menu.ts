@@ -1,11 +1,11 @@
-export const START_MENU = [
+export let START_MENU = [
   [{ text: "🐵 Profile", callback_data: "profile" }],
   [{ text: "👛 Wallets", callback_data: "wallets" }],
   [{ text: "❌ Close", callback_data: "close" }],
 ];
 
 
-export const WALLET_MENU_WITH_ACCOUNT = [
+export let WALLET_MENU_WITH_ACCOUNT = [
   [
     {
       text: "🔑Session Key(Authorize Exec Limit Order)",
@@ -20,7 +20,7 @@ export const WALLET_MENU_WITH_ACCOUNT = [
 ];
 
 
-export const WALLET_MENU_NO_ACCOUNT = [
+export let WALLET_MENU_NO_ACCOUNT = [
   [{ text: "🔑 Import Account", callback_data: "import_account" }],
   [
     {
