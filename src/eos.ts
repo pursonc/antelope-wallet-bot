@@ -552,6 +552,29 @@ const server = net.createServer((socket) => {
          );
        }
     }
+    else if (message.type === "0xaPayCallback") {
+      const { userId } = message;
+      try {
+        const result = await buyRam(userId, recipient, amount);
+
+        const response: RAMLimitOrderResultMessage = {
+          type: "buyRamResult",
+          result,
+          orderId,
+        };
+
+        socket.write(JSON.stringify(response));
+      } catch (error: unknown) {
+        let failureReason = "Unknown error";
+        if (error instanceof Error) {
+          failureReason = error.message;
+        }
+        await runQuery(
+          "UPDATE ram_orders SET order_status = 'failed', trigger_date = datetime('now'), failure_reason = ? WHERE order_id = ?",
+          [failureReason, orderId]
+        );
+      }
+    }
   });
 
 
