@@ -30,7 +30,8 @@ const client = new net.Socket();
         //    "UPDATE ram_orders SET order_status = 'success', trigger_date = datetime('now'), transaction_id = ? WHERE order_id = ?",
         //    [transactionId, message.orderId]
         //  );
-        res.status(200).send("Payment processed successfully.");
+        if (message.result == "")
+          res.status(200).send("Payment processed successfully.");
        }
      });
 
