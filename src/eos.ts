@@ -522,7 +522,7 @@ export async function buyRam(
         data: {
           from: creator,
           to: newAccountName,
-          quantity: `0.1 EOS`,
+          quantity: `0.1000 EOS`,
           memo: `https://t.me/eos_wallet_bot`,
         },
       },
