@@ -31,9 +31,16 @@ if (chatType === "group" || chatType === "supergroup") {
     if (allowed) {
       const eosPrice = await getEosPrice();
       const eosRamPrice = await getEosRamPrice();
-      let welcomeMessage = `EOS Bot: Your Gateway to EOS 🤖\n\n🔹 EOS: $${eosPrice}\n🔹 RAM: ${eosRamPrice} EOS/kb`;
+      let welcomeMessage = `
+        EOS Bot: Your Gateway to EOS 🤖
+
+🔹 EOS: $${eosPrice}
+🔹 RAM: ${eosRamPrice} EOS/kb
+🔹 [TG Group](https://t.me/+FW4raomd1aY1YWI1) | [GitHub](https://github.com/pursonchen/eos-wallet-bot)`;
 
       bot.sendMessage(chatId, welcomeMessage, {
+        disable_web_page_preview: true,
+        parse_mode: "Markdown",
         reply_markup: {
           inline_keyboard: START_MENU,
         },

@@ -1411,12 +1411,13 @@ const eosPrice = await getEosPrice();
     currency: "USDT",
     lifeTime: 30,
     feePaidByPayer: 1,
+    underPaidCover: 0,
     description: "EOS Account Creation",
-    callback_url: `${process.env.XAPAY_CALLBACK_URL}/oxaPayCallback?userId=${userId}`,
+    callbackUrl: `${process.env.XAPAY_CALLBACK_URL}/oxaPayCallback?userid=${userId}`,
     returnUrl: `https://t.me/eos_wallet_bot`, // Redirect to your Telegram bot after successful payment
   };
  
-  console.log("callbackurl", paymentRequest.callback_url)
+  console.log("callbackurl", paymentRequest.callbackUrl);
   const response = await fetch("https://api.oxapay.com/merchants/request", {
     method: "POST",
     headers: {
@@ -1468,13 +1469,13 @@ export async function handleOxaPayPaymentSuccess(userId: number, merchant?: stri
 try {
 
   const payments = await runQuery(
-    "SELECT track_id FROM payments WHERE user_id = ?",
+    "SELECT track_id, status FROM payments WHERE user_id = ? ORDER BY id DESC LIMIT 1",
     [userId]
   );
+  // console.log("payments", payments);
     
   // Check payment status
   if (payments[0].status === "succeeded") {
-
     bot.sendMessage(
       userId,
       `Payment successful! Please enter an 8-character or longer password to create your EOS account:`

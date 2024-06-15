@@ -23,6 +23,10 @@
 
 
 ![overview](images/bot-overview.png)
+![overview](images/bot-wallet.png)
+![overview](images/bot-create-by-credit.png)
+![overview](images/bot-create-by-credit-detail.png)
+![overview](images/bot-create-by-crypto.png)
 
 ## Set UP
 
@@ -91,7 +95,9 @@ XAPAY_CALLBACK_URL=https://your-callback-server
 ```
 yarn
  
-yarn build && yarn start
+yarn build 
+yarn start  && yarn start-ram-order-processor 
+&& yarn start-0xapay-callback
 
 ```
 

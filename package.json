@@ -4,7 +4,9 @@
   "description": "A Telegram bot implemented with TypeScript",
   "main": "src/bot.ts",
   "scripts": {
-    "start": "node dist/bot.js && node dist/ramOrderProcessor.js && dist/0xapayCallback.js",
+    "start": "node dist/bot.js",
+    "start-ram-order-processor": "node dist/ramOrderProcessor.js",
+    "start-0xapay-callback": "node dist/0xapayCallback.js",
     "build": "tsc",
     "dev": "ts-node-dev src/bot.ts"
   },

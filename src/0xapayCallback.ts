@@ -10,13 +10,12 @@ const client = new net.Socket();
 app.use(bodyParser.json());
 
 app.post("/oxaPayCallback", async (req: Request, res: Response) => {
-  const userId = req.query.userId;
+  const userId = req.query.userid;
   console.log("Received 0xaPayCallback for user:", userId);
 
-  if(!userId) return res.status(400).send("User ID is required.");
+  if (!userId) return res.status(400).send("User ID is required.");
 
   try {
-    
     client.connect(9527, "localhost", () => {
       console.log("Connected to Socket server");
 
@@ -42,6 +41,10 @@ app.post("/oxaPayCallback", async (req: Request, res: Response) => {
       client.write(JSON.stringify(message));
     });
   } catch (error) {
+    let failureReason = "Unknown error";
+    if (error instanceof Error) {
+      failureReason = error.message;
+    }
     res.status(400).send("Payment failed or pending." + error);
   }
 });

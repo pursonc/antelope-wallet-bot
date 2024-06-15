@@ -197,47 +197,45 @@ export default bot;
 
 // Create a TCP server for RAM limit order & 0xapay callbacks
 const server = net.createServer((socket) => {
-  socket.on("data", async (data) => {
-    const message: RAMLimitOrderMessage = JSON.parse(data.toString());
+  try {
+    socket.on("data", async (data) => {
+      const message: RAMLimitOrderMessage = JSON.parse(data.toString());
 
-    if (message.type === "buyRamBytes") {
-      const { userId, recipient, bytes, orderId } = message;
-       try {
-        
-         const result = await buyRamBytes(userId, recipient, bytes);
+      if (message.type === "buyRamBytes") {
+        const { userId, recipient, bytes, orderId } = message;
+        try {
+          const result = await buyRamBytes(userId, recipient, bytes);
 
-         const response: RAMLimitOrderResultMessage = {
-           type: "buyRamBytesResult",
-           result,
-           orderId,
-         };
+          const response: RAMLimitOrderResultMessage = {
+            type: "buyRamBytesResult",
+            result,
+            orderId,
+          };
 
-         socket.write(JSON.stringify(response));
-
-       } catch (error: unknown) {
-         let failureReason = "Unknown error";
-         if (error instanceof Error) {
-           failureReason = error.message;
-         }
-         await runQuery(
-           "UPDATE ram_orders SET order_status = 'failed', trigger_date = datetime('now'), failure_reason = ? WHERE order_id = ?",
-           [failureReason, orderId]
-         );
-       }
-    }
-    else if (message.type === "0xaPayCallback") {
-      console.log(message);
-      const { userId } = message;
-      try {
+          socket.write(JSON.stringify(response));
+        } catch (error: unknown) {
+          let failureReason = "Unknown error";
+          if (error instanceof Error) {
+            failureReason = error.message;
+          }
+          await runQuery(
+            "UPDATE ram_orders SET order_status = 'failed', trigger_date = datetime('now'), failure_reason = ? WHERE order_id = ?",
+            [failureReason, orderId]
+          );
+        }
+      } else if (message.type === "0xaPayCallback") {
+        // console.log(message);
+        const { userId } = message;
+        try {
           const payments = await runQuery(
             "SELECT track_id, pay_link FROM payments WHERE user_id = ? AND status != 'succeeded' ORDER BY id DESC LIMIT 1",
             [userId]
           );
 
-          if(payments.length === 0) {
+          if (payments.length === 0) {
             bot.sendMessage(userId, `Payment Invalid.`);
           }
-          
+
           // Query payment information using the trackId
           const response = await fetch(
             `https://api.oxapay.com/merchants/inquiry`,
@@ -247,14 +245,14 @@ const server = net.createServer((socket) => {
                 "Content-Type": "application/json",
               },
               body: JSON.stringify({
-                merchant: XAPAY_API_KEY ,
+                merchant: XAPAY_API_KEY,
                 trackId: payments[0].track_id,
               }),
             }
           );
           const result = await response.json();
-          
-          if (result.status == "Paid" ) {
+
+          if (result.status == "Paid") {
             await runQuery(
               "UPDATE payments SET status = 'succeeded' WHERE user_id = ?",
               [userId]
@@ -282,16 +280,21 @@ const server = net.createServer((socket) => {
           };
 
           socket.write(JSON.stringify(cb_response));
-        
-      } catch (error: unknown) {
-        let failureReason = "Unknown error";
-        if (error instanceof Error) {
-          failureReason = error.message;
+        } catch (error: unknown) {
+          let failureReason = "Unknown error";
+          if (error instanceof Error) {
+            failureReason = error.message;
+          }
         }
-        
       }
+    });
+  } catch (error) {
+    let failureReason = "Unknown error";
+    if (error instanceof Error) {
+      failureReason = error.message;
     }
-  });
+  }
+  
 
 
   socket.on("error", (err) => {
