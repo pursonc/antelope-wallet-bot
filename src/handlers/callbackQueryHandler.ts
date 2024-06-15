@@ -7,6 +7,7 @@ import {
   checkEosAccountExists,
   sendWalletOptions,
   getEosRamPrice,
+  getEosPrice,
 } from "../utils";
 import {
   importEosAccount,
@@ -21,6 +22,7 @@ import {
   getSessionExpirationTime,
   getSessionPrivateKey,
   isSessionActive,
+  createEosAccount,
 } from "../eos";
 import {
   WALLET_MENU_NO_ACCOUNT,
@@ -28,6 +30,8 @@ import {
   START_MENU,
 } from "../menu";
 import bot from "../bot";
+import { PAYMENT_TYPES } from "../types";
+
 
 export async function handleSelectAccount(callbackQuery: CallbackQuery) {
   const userId = callbackQuery.from.id;
@@ -174,7 +178,7 @@ export async function handleWallets(callbackQuery: CallbackQuery) {
       // Session is still valid, no need to unlock
       const eosBalance = await getEosBalance(eos_account_name);
 
-      message = `🔹 Account Name: <code>${eos_account_name}</code>\n🔹 Public Key: <code>${eos_public_key}</code>\n🔹 Private Key(Plz Backup❗️): <span class="tg-spoiler">${privateKey}</span>\n🔹 Balance: ${eosBalance} EOS\n`;
+      message = `🔹 Account Name: <code>${eos_account_name}</code>\n🔹 Public Key: <code>${eos_public_key}</code>\n🔹 Private Key(Plz Backup❗️): <span class="tg-spoiler">${privateKey}</span>\n🔹 Balance: ${eosBalance} \n`;
       if (days || hours || minutes) {
         message += `🔹 Session Expire in ${days && `${days} days`} ${
           hours && `${hours} hours`
@@ -224,7 +228,7 @@ export async function handleWallets(callbackQuery: CallbackQuery) {
         } else {
           const eosBalance = await getEosBalance(eos_account_name);
           await authorizeUser(userId, password, 1);
-          message = `<b>Unlock Wallet then buy RAM or transfer. </b>\n\n🔹 Account Name: <code>${eos_account_name}</code>\n🔹 Public Key: <code>${eos_public_key}</code>\n🔹 Private Key(Plz Backup❗️): <span class="tg-spoiler">${decryptedPrivateKey}</span>\n🔹 Balance: ${eosBalance} EOS\n`;
+          message = `<b>Unlock Wallet then buy RAM or transfer. </b>\n\n🔹 Account Name: <code>${eos_account_name}</code>\n🔹 Public Key: <code>${eos_public_key}</code>\n🔹 Private Key(Plz Backup❗️): <span class="tg-spoiler">${decryptedPrivateKey}</span>\n🔹 Balance: ${eosBalance} \n`;
           inlineKeyboard = WALLET_MENU_WITH_ACCOUNT;
         const ramOrders = await runQuery(
         "SELECT * FROM ram_orders WHERE user_id = ?",
@@ -270,6 +274,52 @@ export async function handleWallets(callbackQuery: CallbackQuery) {
       ];
     } else {
       inlineKeyboard = WALLET_MENU_NO_ACCOUNT;
+        let creatorAccount = process.env.EOS_CREATOR_ACCOUNT;
+        let creatorAmount = 0
+        if (creatorAccount) {
+          const creatorAmountStr = await getEosBalance(creatorAccount);
+          creatorAmount = parseFloat(creatorAmountStr.split(" ")[0]);
+          console.log("creatorAmount", creatorAmount)
+        }
+
+        const hasCreateAccoutByCard = inlineKeyboard.some((row) =>
+          row.some(
+            (button) => button.callback_data === "pay_for_account_by_card"
+          )
+        );
+        if (
+          !hasCreateAccoutByCard &&
+          process.env.PAYMENT_PROVIDER_TOKEN &&
+          process.env.EOS_CREATOR_ACCOUNT_PRIVATE_KEY &&
+          creatorAmount > Number(process.env.EOS_ACCOUNT_PRICE) * 1.2
+        ) {
+          inlineKeyboard.unshift([
+            {
+              text: "💳 Create Account (Credit Card)",
+              callback_data: "pay_for_account_by_card",
+            },
+          ]);
+        }
+
+        const hasCreateAccoutByCrypto = inlineKeyboard.some((row) =>
+          row.some(
+            (button) => button.callback_data === "pay_for_account_by_crypto"
+          )
+        );
+        if (
+          !hasCreateAccoutByCrypto &&
+          process.env.XAPAY_API_KEY &&
+          process.env.EOS_CREATOR_ACCOUNT_PRIVATE_KEY &&
+          creatorAmount > Number(process.env.EOS_ACCOUNT_PRICE) * 1.2
+        ) {
+          inlineKeyboard.unshift([
+            {
+              text: "🟠 Create Account (Crypto)",
+              callback_data: "pay_for_account_by_crypto",
+            },
+          ]);
+        }
+      
     }
 
     bot.editMessageText(message, {
@@ -390,16 +440,15 @@ export async function handleCreateAccountContract(
     const password = msg.text;
 
     try {
-      const eosAccountName = await generateEosAccountName();
-      const accountExists = await checkEosAccountExists(eosAccountName);
+      let eosAccountName = "";
 
-      if (accountExists) {
-        bot.sendMessage(
-          chatId!,
-          "Generated account already exists. Please try again."
-        );
-        return;
-      }
+        while (true) {
+            eosAccountName = await generateEosAccountName();
+            let accountExists = await checkEosAccountExists(eosAccountName);
+            if (!accountExists) {
+                break;
+            }
+        }
 
       const { privateKey, publicKey } = generateEosKeyPair();
       await runQuery(
@@ -989,6 +1038,8 @@ export async function handleConfirmDeleteAccount(callbackQuery: CallbackQuery) {
       "UPDATE users SET eos_account_name = NULL, eos_public_key = NULL, eos_private_key = NULL, permission_name = NULL WHERE user_id = ?",
       [userId]
     );
+    await runQuery("DELETE FROM ram_orders WHERE user_id = ?", [userId]);
+    await runQuery("DELETE FROM payments WHERE user_id = ?", [userId]);
 
     bot.editMessageText("Your EOS account information has been deleted.", {
       chat_id: chatId,
@@ -1142,6 +1193,7 @@ export async function handleViewRAMOrders(callbackQuery: CallbackQuery) {
     },
   });
 }
+
 export async function handleClearRAMOrders(callbackQuery: CallbackQuery) {
   const userId = callbackQuery.from.id;
   const chatId = callbackQuery.message?.chat.id;
@@ -1151,4 +1203,373 @@ export async function handleClearRAMOrders(callbackQuery: CallbackQuery) {
       inline_keyboard: [[{ text: "↔️ Wallet", callback_data: "wallets" }]],
     },
   });
+}
+
+
+export async function handleStripePayment(callbackQuery: CallbackQuery, provider_token?: string, telegram_bot_token?: string) {
+  const chatId = callbackQuery.message?.chat.id!;
+  const userId = callbackQuery.from.id;
+
+  try {
+    const eosPrice = await getEosPrice();
+    const amount = Math.ceil(
+      eosPrice * Number(process.env.EOS_ACCOUNT_PRICE) )* 100
+     // Convert to cents and round up
+
+    const invoice = {
+      chat_id: chatId,
+      title: "New EOS Account",
+      description: "Payment for services creating a new EOS account",
+      payload: JSON.stringify({ userId, amount }), // Payload to identify the payment
+      provider_token,
+      start_parameter: "start",
+      currency: "USD",
+      prices: [{ label: "USD", amount }],
+      max_tip_amount: 500,
+      suggested_tip_amounts: [100, 200, 300, 500],
+      photo_url:
+        "https://static-btcfx.oss-ap-southeast-1.aliyuncs.com/invoice-cartoon.png",
+      photo_width: 512,
+      photo_height: 512,
+      need_name: false,
+      need_phone_number: false,
+      need_email: false,
+      need_shipping_address: false,
+      send_phone_number_to_provider: false,
+      send_email_to_provider: false,
+      is_flexible: false,
+    };
+
+    const response = await fetch(
+      `https://api.telegram.org/bot${telegram_bot_token}/sendInvoice`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(invoice),
+      }
+    );
+    
+
+    const result = await response.json();
+    if (!result.ok) {
+      throw new Error(result.description);
+    }
+
+    // Save the invoice in the database
+    await runQuery(
+      "INSERT INTO payments (user_id, amount, status, chat_id, type) VALUES (?, ?, ?, ?, ?)",
+      [userId, amount, "pending", chatId, PAYMENT_TYPES[0]]
+    );
+  } catch (error) {
+    console.error("Error creating invoice:", error);
+    bot.sendMessage(chatId, "Failed to create invoice. Please try again.");
+  }
+}
+
+function passwordInvalidRetryCreateAccount(msg: Message, userId: number,  count: number) {
+ if (count >= 2) {
+    bot.sendMessage(userId, "Create Account Fail. Please contract Admin.");
+    return;
+ }
+    // Listen for the password input
+  bot.once("message", async (msg: Message) => {
+    const password = msg.text;
+    // Validate the password length
+    if (password && password.length >= 8) {
+      try {
+        const result = await createEosAccount(
+        userId,
+        password,
+        Number(process.env.EOS_ACCOUNT_PRICE)!
+      );
+      bot.sendMessage(
+        userId,
+        `Account create successfully!\nTransaction ID: https://bloks.io/transaction/${result.resolved?.transaction.id}`,
+        {
+          parse_mode: "HTML",
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "⬅️ Return wallets list", callback_data: "wallets" }],
+            ],
+          },
+        }
+      );
+      } catch (error: unknown) {
+        let errorMessage = "Unknown error";
+        if (error instanceof Error) {
+            errorMessage = error.message;
+        }
+        bot.sendMessage(userId!, `Error create EOS account: ${errorMessage}`, {
+          parse_mode: "HTML",
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "⬅️ Return wallets list", callback_data: "wallets" }],
+            ],
+          },
+        });
+        
+}
+        
+    } else {
+      bot.sendMessage(
+        userId,
+        "Password must be at least 8 characters long. Please try again."
+      );
+        passwordInvalidRetryCreateAccount(msg, userId,  count + 1);
+    }
+ });
+}
+
+
+export async function handlePaymentSuccess(payload: string) {
+  const payment = JSON.parse(payload);
+  const { userId, amount } = payment;
+
+  await runQuery(
+    "UPDATE payments SET status = 'succeeded' WHERE user_id = ? AND amount = ?",
+    [userId, amount]
+  );
+
+  bot.sendMessage(
+    userId,
+    `Payment successful! Please enter an 8-character or longer password to create your EOS account:`
+  );
+  
+  // Listen for the password input
+  bot.once("message", async (msg: Message) => {
+    const password = msg.text;
+    // Validate the password length
+    if (password && password.length >= 8) {
+        try {
+          const result = await createEosAccount(
+            userId,
+            password,
+            Number(process.env.EOS_ACCOUNT_PRICE)!
+          );
+          bot.sendMessage(
+            userId,
+            `Account create successfully!\nTransaction ID: https://bloks.io/transaction/${result.resolved?.transaction.id}`,
+            {
+              parse_mode: "HTML",
+              reply_markup: {
+                inline_keyboard: [
+                  [
+                    {
+                      text: "⬅️ Return wallets list",
+                      callback_data: "wallets",
+                    },
+                  ],
+                ],
+              },
+            }
+          );
+        } catch (error: unknown) {
+          let errorMessage = "Unknown error";
+          if (error instanceof Error) {
+            errorMessage = error.message;
+          }
+          bot.sendMessage(
+            userId!,
+            `Error create EOS account: ${errorMessage}`,
+            {
+              parse_mode: "HTML",
+              reply_markup: {
+                inline_keyboard: [
+                  [
+                    {
+                      text: "⬅️ Return wallets list",
+                      callback_data: "wallets",
+                    },
+                  ],
+                ],
+              },
+            }
+          );
+        }
+      
+    } else {
+      bot.sendMessage(
+        userId,
+        "Password must be at least 8 characters long. Please try again."
+      );
+      passwordInvalidRetryCreateAccount(msg, userId,  1);
+    }
+  });
+}
+
+export async function handlePaymentFailure(payload: string) {
+  const payment = JSON.parse(payload);
+  const { userId, amount } = payment;
+
+  await runQuery(
+    "UPDATE payments SET status = 'failed' WHERE user_id = ? AND amount = ?",
+    [userId, amount]
+  );
+
+  bot.sendMessage(userId, "Your payment failed. Please try again.");
+}
+
+
+export async function handleOxaPayPayment(callbackQuery: CallbackQuery, XAPAY_API_KEY?: string) {
+
+      const chatId = callbackQuery.message?.chat.id!;
+      const userId = callbackQuery.from.id;
+
+const eosPrice = await getEosPrice();
+  const invoiceAmount = Math.ceil(
+    eosPrice * Number(process.env.EOS_ACCOUNT_PRICE)
+  ); // EOS price times 4, rounded up
+
+  const paymentRequest = {
+    merchant: XAPAY_API_KEY || "sandbox",
+    amount: invoiceAmount,
+    currency: "USDT",
+    lifeTime: 30,
+    feePaidByPayer: 1,
+    underPaidCover: 0,
+    description: "EOS Account Creation",
+    callbackUrl: `${process.env.XAPAY_CALLBACK_URL}/oxaPayCallback?userid=${userId}`,
+    returnUrl: `https://t.me/eos_wallet_bot`, // Redirect to your Telegram bot after successful payment
+  };
+ 
+  console.log("callbackurl", paymentRequest.callbackUrl);
+  const response = await fetch("https://api.oxapay.com/merchants/request", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(paymentRequest),
+  });
+
+  const paymentData = await response.json();
+
+  const {result, message, trackId, payLink} = paymentData;
+  // Save the invoice in the database
+  await runQuery(
+    "INSERT INTO payments (user_id, amount, status, chat_id, type, track_id, pay_link) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    [userId, invoiceAmount, `${result}-${message}`, chatId, PAYMENT_TYPES[1], trackId, payLink]
+  );
+  
+
+ 
+  if (result == 100) {
+     bot.editMessageText(
+       `Please complete your payment by clicking the link below:\n${paymentData.payLink}`,
+       {
+         chat_id: chatId,
+         message_id: callbackQuery.message?.message_id,
+         reply_markup: {
+           inline_keyboard: [
+             [{ text: "Complete Payment", url: paymentData.payLink }],
+           ],
+         },
+       }
+     );
+    
+  } else {
+    bot.sendMessage(
+      chatId,
+      "Failed to initiate payment. Please try again later.",
+      {
+        reply_markup: {
+          inline_keyboard: [[{ text: "❌ Close", callback_data: "close" }]],
+        },
+      }
+    );
+  }
+}
+
+export async function handleOxaPayPaymentSuccess(userId: number, merchant?: string) {
+
+try {
+
+  const payments = await runQuery(
+    "SELECT track_id, status FROM payments WHERE user_id = ? ORDER BY id DESC LIMIT 1",
+    [userId]
+  );
+  console.log("payments", payments);
+    
+  // Check payment status
+  if (payments[0].status === "succeeded") {
+    bot.sendMessage(
+      userId,
+      `Payment successful! Please enter an 8-character or longer password to create your EOS account:`
+    );
+
+    bot.once("message", async (msg: Message) => {
+      const password = msg.text;
+
+      if (password && password.length >= 8) {
+        try {
+          const result = await createEosAccount(
+            userId,
+            password,
+            Number(process.env.EOS_ACCOUNT_PRICE)!
+          );
+          bot.sendMessage(
+            userId,
+            `Account create successfully!\nTransaction ID: https://bloks.io/transaction/${result.resolved?.transaction.id}`,
+            {
+              parse_mode: "HTML",
+              reply_markup: {
+                inline_keyboard: [
+                  [
+                    {
+                      text: "⬅️ Return wallets list",
+                      callback_data: "wallets",
+                    },
+                  ],
+                ],
+              },
+            }
+          );
+        } catch (error: unknown) {
+          let errorMessage = "Unknown error";
+          if (error instanceof Error) {
+            errorMessage = error.message;
+             
+          }
+          bot.sendMessage(
+            userId!,
+            `Error create EOS account: ${errorMessage}`,
+            {
+              parse_mode: "HTML",
+              reply_markup: {
+                inline_keyboard: [
+                  [
+                    {
+                      text: "⬅️ Return wallets list",
+                      callback_data: "wallets",
+                    },
+                  ],
+                ],
+              },
+            }
+          );
+        }
+      } else {
+        bot.sendMessage(
+          userId,
+          "Password must be at least 8 characters long. Please try again."
+        );
+        passwordInvalidRetryCreateAccount(msg, userId, 1);
+      }
+    });
+  } else {
+    bot.sendMessage(
+      userId,
+      "Payment not completed. Please complete the payment to proceed."
+    );
+  }
+} catch (error: unknown) {
+     let errorMessage = "Unknown error";
+     if (error instanceof Error) {
+       errorMessage = error.message;
+     }
+    bot.sendMessage(userId, `Error verifying payment: ${errorMessage}`);
+}
+
+  
 }

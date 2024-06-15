@@ -21,12 +21,12 @@ export let WALLET_MENU_WITH_ACCOUNT = [
 
 
 export let WALLET_MENU_NO_ACCOUNT = [
-  [{ text: "🔑 Import Account", callback_data: "import_account" }],
   [
     {
       text: "💁🏻‍♂️ Create Account (Contract)",
       callback_data: "create_account_contract",
     },
   ],
+  [{ text: "🔑 Import Account", callback_data: "import_account" }],
   [{ text: "❌ Close", callback_data: "close" }],
 ];
