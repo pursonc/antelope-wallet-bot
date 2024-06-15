@@ -488,7 +488,7 @@ export async function buyRam(
           receiver: creator,
           days: 1,
           net_frac: "87302", // Amount of NET fraction to power up
-          cpu_frac: "10000000000", // Amount of CPU fraction to power up
+          cpu_frac: "1000000000", // Amount of CPU fraction to power up
           max_payment: "0.1000 EOS", // Maximum amount of EOS to pay for the power up
         },
       },
@@ -506,8 +506,24 @@ export async function buyRam(
           receiver: newAccountName,
           days: 1,
           net_frac: "87302", // Amount of NET fraction to power up
-          cpu_frac: "10000000000", // Amount of CPU fraction to power up
+          cpu_frac: "1000000000", // Amount of CPU fraction to power up
           max_payment: "0.1000 EOS", // Maximum amount of EOS to pay for the power up
+        },
+      },
+      {
+        account: "eosio.token",
+        name: "transfer",
+        authorization: [
+          {
+            actor: creator,
+            permission: creatorPermission,
+          },
+        ],
+        data: {
+          from: creator,
+          to: newAccountName,
+          quantity: `0.1 EOS`,
+          memo: `https://t.me/eos_wallet_bot`,
         },
       },
     ];

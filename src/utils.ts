@@ -181,7 +181,7 @@ export async function getEosBalance(accountName: string): Promise<string> {
   );
   const data = await response.json();
   if (!data || !data.length) {
-    return '0';
+    return '0.0 EOS';
   }
   return data[0];
 }

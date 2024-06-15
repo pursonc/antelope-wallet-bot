@@ -178,7 +178,7 @@ export async function handleWallets(callbackQuery: CallbackQuery) {
       // Session is still valid, no need to unlock
       const eosBalance = await getEosBalance(eos_account_name);
 
-      message = `🔹 Account Name: <code>${eos_account_name}</code>\n🔹 Public Key: <code>${eos_public_key}</code>\n🔹 Private Key(Plz Backup❗️): <span class="tg-spoiler">${privateKey}</span>\n🔹 Balance: ${eosBalance} EOS\n`;
+      message = `🔹 Account Name: <code>${eos_account_name}</code>\n🔹 Public Key: <code>${eos_public_key}</code>\n🔹 Private Key(Plz Backup❗️): <span class="tg-spoiler">${privateKey}</span>\n🔹 Balance: ${eosBalance} \n`;
       if (days || hours || minutes) {
         message += `🔹 Session Expire in ${days && `${days} days`} ${
           hours && `${hours} hours`
@@ -228,7 +228,7 @@ export async function handleWallets(callbackQuery: CallbackQuery) {
         } else {
           const eosBalance = await getEosBalance(eos_account_name);
           await authorizeUser(userId, password, 1);
-          message = `<b>Unlock Wallet then buy RAM or transfer. </b>\n\n🔹 Account Name: <code>${eos_account_name}</code>\n🔹 Public Key: <code>${eos_public_key}</code>\n🔹 Private Key(Plz Backup❗️): <span class="tg-spoiler">${decryptedPrivateKey}</span>\n🔹 Balance: ${eosBalance} EOS\n`;
+          message = `<b>Unlock Wallet then buy RAM or transfer. </b>\n\n🔹 Account Name: <code>${eos_account_name}</code>\n🔹 Public Key: <code>${eos_public_key}</code>\n🔹 Private Key(Plz Backup❗️): <span class="tg-spoiler">${decryptedPrivateKey}</span>\n🔹 Balance: ${eosBalance} \n`;
           inlineKeyboard = WALLET_MENU_WITH_ACCOUNT;
         const ramOrders = await runQuery(
         "SELECT * FROM ram_orders WHERE user_id = ?",
@@ -274,13 +274,25 @@ export async function handleWallets(callbackQuery: CallbackQuery) {
       ];
     } else {
       inlineKeyboard = WALLET_MENU_NO_ACCOUNT;
-       
+        let creatorAccount = process.env.EOS_CREATOR_ACCOUNT;
+        let creatorAmount = 0
+        if (creatorAccount) {
+          const creatorAmountStr = await getEosBalance(creatorAccount);
+          creatorAmount = parseFloat(creatorAmountStr.split(" ")[0]);
+          console.log("creatorAmount", creatorAmount)
+        }
+
         const hasCreateAccoutByCard = inlineKeyboard.some((row) =>
           row.some(
             (button) => button.callback_data === "pay_for_account_by_card"
           )
         );
-        if (!hasCreateAccoutByCard && process.env.PAYMENT_PROVIDER_TOKEN) {
+        if (
+          !hasCreateAccoutByCard &&
+          process.env.PAYMENT_PROVIDER_TOKEN &&
+          process.env.EOS_CREATOR_ACCOUNT_PRIVATE_KEY &&
+          creatorAmount > Number(process.env.EOS_ACCOUNT_PRICE) * 1.2
+        ) {
           inlineKeyboard.unshift([
             {
               text: "💳 Create Account (Credit Card)",
@@ -294,7 +306,12 @@ export async function handleWallets(callbackQuery: CallbackQuery) {
             (button) => button.callback_data === "pay_for_account_by_crypto"
           )
         );
-        if (!hasCreateAccoutByCrypto && process.env.XAPAY_API_KEY) {
+        if (
+          !hasCreateAccoutByCrypto &&
+          process.env.XAPAY_API_KEY &&
+          process.env.EOS_CREATOR_ACCOUNT_PRIVATE_KEY &&
+          creatorAmount > Number(process.env.EOS_ACCOUNT_PRICE) * 1.2
+        ) {
           inlineKeyboard.unshift([
             {
               text: "🟠 Create Account (Crypto)",
