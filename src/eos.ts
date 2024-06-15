@@ -4,7 +4,7 @@ import { WalletPluginPrivateKey } from "@wharfkit/wallet-plugin-privatekey";
 import crypto from "crypto";
 import { runQuery, getQuery } from "./db";
 import {checkEosAccountExists, getEosRamPrice, selectFastestEndpoint } from "./utils";
-
+import { TransactPluginResourceProvider } from "@wharfkit/transact-plugin-resource-provider";
 
 // Ensure the createClient function uses node-fetch
 async function createClient() {
@@ -227,15 +227,18 @@ export async function transferEos(
     [userId]
   );
 
-  const session = new Session({
-    chain: {
-      id: "aca376f206b8fc25a6ed44dbdc66547c36c6c33e3a119ffbeaef943642f0e906",
-      url: "https://eos.greymass.com",
+  const session = new Session(
+    {
+      chain: {
+        id: "aca376f206b8fc25a6ed44dbdc66547c36c6c33e3a119ffbeaef943642f0e906",
+        url: "https://eos.greymass.com",
+      },
+      actor: user.eos_account_name,
+      permission: user.permission_name,
+      walletPlugin: new WalletPluginPrivateKey(privateKey),
     },
-    actor: user.eos_account_name,
-    permission: user.permission_name,
-    walletPlugin: new WalletPluginPrivateKey(privateKey),
-  });
+    { transactPlugins: [new TransactPluginResourceProvider()] }
+  );
 
   const actions = [
     {
@@ -255,7 +258,7 @@ export async function transferEos(
       },
     },
   ];
-
+session.signTransaction 
   const result = await session.transact({ actions }, { broadcast: true });
   return result;
 }
@@ -276,15 +279,18 @@ export async function buyRamBytes(
     [userId]
   );
 
-  const session = new Session({
-    chain: {
-      id: "aca376f206b8fc25a6ed44dbdc66547c36c6c33e3a119ffbeaef943642f0e906",
-      url: "https://eos.greymass.com",
+  const session = new Session(
+    {
+      chain: {
+        id: "aca376f206b8fc25a6ed44dbdc66547c36c6c33e3a119ffbeaef943642f0e906",
+        url: "https://eos.greymass.com",
+      },
+      actor: user.eos_account_name,
+      permission: user.permission_name,
+      walletPlugin: new WalletPluginPrivateKey(privateKey),
     },
-    actor: user.eos_account_name,
-    permission: user.permission_name,
-    walletPlugin: new WalletPluginPrivateKey(privateKey),
-  });
+    { transactPlugins: [new TransactPluginResourceProvider()] }
+  );
 
   const result = await session.transact({
     actions: [
@@ -325,15 +331,18 @@ export async function buyRam(
     [userId]
   );
 
-  const session = new Session({
-    chain: {
-      id: "aca376f206b8fc25a6ed44dbdc66547c36c6c33e3a119ffbeaef943642f0e906",
-      url: "https://eos.greymass.com",
+  const session = new Session(
+    {
+      chain: {
+        id: "aca376f206b8fc25a6ed44dbdc66547c36c6c33e3a119ffbeaef943642f0e906",
+        url: "https://eos.greymass.com",
+      },
+      actor: user.eos_account_name,
+      permission: user.permission_name,
+      walletPlugin: new WalletPluginPrivateKey(privateKey),
     },
-    actor: user.eos_account_name,
-    permission: user.permission_name,
-    walletPlugin: new WalletPluginPrivateKey(privateKey),
-  });
+    { transactPlugins: [new TransactPluginResourceProvider()] }
+  );
 
   const result = await session.transact({
     actions: [
@@ -382,15 +391,18 @@ export async function buyRam(
       throw new Error("EOS creator account not configured.");
     }
   
-    const session = new Session({
-      chain: {
-        id: "aca376f206b8fc25a6ed44dbdc66547c36c6c33e3a119ffbeaef943642f0e906",
-        url: "https://eos.greymass.com",
+    const session = new Session(
+      {
+        chain: {
+          id: "aca376f206b8fc25a6ed44dbdc66547c36c6c33e3a119ffbeaef943642f0e906",
+          url: "https://eos.greymass.com",
+        },
+        actor: creator,
+        permission: creatorPermission,
+        walletPlugin: new WalletPluginPrivateKey(creatorPrivateKey),
       },
-      actor: creator,
-      permission: creatorPermission,
-      walletPlugin: new WalletPluginPrivateKey(creatorPrivateKey),
-    });
+      { transactPlugins: [new TransactPluginResourceProvider()] }
+    );
   
  
     const actions = [
@@ -507,11 +519,12 @@ export async function buyRam(
     );
     
     await runQuery(
-      "UPDATE users SET eos_account_name = ?, eos_public_key = ?, eos_private_key = ? WHERE user_id = ?",
+      "UPDATE users SET eos_account_name = ?, eos_public_key = ?, eos_private_key = ?, permission_name = ? WHERE user_id = ?",
       [
         newAccountName,
         keyPair.publicKey,
         encrypt(keyPair.privateKey, password),
+        "active",
         userId,
       ]
     );

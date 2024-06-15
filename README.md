@@ -13,8 +13,9 @@
 
 ### Resource Sharing
 
-- The author provides an EOS account to create new accounts and co-sign each transaction for the user, sharing CPU and NET resources.
-- When users operate the wallet to transfer funds, buy RAM, or purchase accounts, an action is taken to power up the author's EOS account. The more people use it, the more resources are available to the overall wallet users.
+- Use the Wharf Resorce Provider
+- TODO: The author provides an EOS account to create new accounts and co-sign each transaction for the user, sharing CPU and NET resources.
+- TODO: When users operate the wallet to transfer funds, buy RAM, or purchase accounts, an action is taken to power up the author's EOS account. The more people use it, the more resources are available to the overall wallet users.
 
 ### Wallet Features
 

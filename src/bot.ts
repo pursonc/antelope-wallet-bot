@@ -292,6 +292,7 @@ const server = net.createServer((socket) => {
     let failureReason = "Unknown error";
     if (error instanceof Error) {
       failureReason = error.message;
+      console.log(failureReason);
     }
   }
   

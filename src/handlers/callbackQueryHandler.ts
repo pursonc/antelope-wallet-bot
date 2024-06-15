@@ -1472,7 +1472,7 @@ try {
     "SELECT track_id, status FROM payments WHERE user_id = ? ORDER BY id DESC LIMIT 1",
     [userId]
   );
-  // console.log("payments", payments);
+  console.log("payments", payments);
     
   // Check payment status
   if (payments[0].status === "succeeded") {
@@ -1512,6 +1512,7 @@ try {
           let errorMessage = "Unknown error";
           if (error instanceof Error) {
             errorMessage = error.message;
+             
           }
           bot.sendMessage(
             userId!,
