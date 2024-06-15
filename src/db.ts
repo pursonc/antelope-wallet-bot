@@ -24,7 +24,7 @@ db.run(
         session_password TEXT,
         session_expiration INTEGER,
         invite_code TEXT,
-        introducer_id INTEGER,
+        introducer_id INTEGER
     )
 `,
   (err) => {
