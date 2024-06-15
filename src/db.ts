@@ -22,7 +22,9 @@ db.run(
         eos_private_key TEXT,
         permission_name TEXT,
         session_password TEXT,
-        session_expiration INTEGER
+        session_expiration INTEGER,
+        invite_code TEXT,
+        introducer_id INTEGER,
     )
 `,
   (err) => {
