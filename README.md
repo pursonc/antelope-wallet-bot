@@ -22,12 +22,8 @@
 - Provides options to purchase EOS accounts via credit card or cryptocurrency.
 - Provides a RAM order book purchase function.
 
+https://github.com/pursonchen/eos-wallet-bot/assets/17820243/ad643fb9-7805-49ce-91a2-6185925d5484
 
-![overview](images/bot-overview.png)
-![overview](images/bot-wallet.png)
-![overview](images/bot-create-by-credit.png)
-![overview](images/bot-create-by-credit-detail.png)
-![overview](images/bot-create-by-crypto.png)
 
 ## Set UP
 
