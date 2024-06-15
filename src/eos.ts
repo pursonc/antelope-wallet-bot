@@ -454,7 +454,10 @@ export async function buyRam(
         data: {
           payer: creator,
           receiver: newAccountName,
-          bytes: Math.floor((eos_amount - 1) * ramPrice * 1024) >= 4000 ? Math.floor((eos_amount - 1) * ramPrice * 1024) : 4000,
+          bytes:
+            Math.floor((eos_amount - 1) * ramPrice * 1024) >= 4000
+              ? Math.floor((eos_amount - 1) * ramPrice * 1024)
+              : 4000,
         },
       },
       {
@@ -469,7 +472,7 @@ export async function buyRam(
         data: {
           payer: creator,
           receiver: creator,
-          bytes: 500,
+          bytes: 1100,
         },
       },
       {
