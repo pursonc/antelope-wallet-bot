@@ -459,6 +459,21 @@ export async function buyRam(
       },
       {
         account: "eosio",
+        name: "buyrambytes",
+        authorization: [
+          {
+            actor: creator,
+            permission: creatorPermission,
+          },
+        ],
+        data: {
+          payer: creator,
+          receiver: creator,
+          bytes: 500,
+        },
+      },
+      {
+        account: "eosio",
         name: "delegatebw",
         authorization: [
           {
