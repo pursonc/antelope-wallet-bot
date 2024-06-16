@@ -1,5 +1,5 @@
 import { Message } from "node-telegram-bot-api";
-import { runQuery } from "../db";
+import { runQuery, getQuery } from "../db";
 import { isAllowed } from "../rateLimiter";
 import { getEosPrice, getEosRamPrice } from "../utils";
 import { START_MENU } from "../menu";
@@ -11,7 +11,7 @@ export async function handleStart(msg: Message) {
   const firstName = msg.from!.first_name;
   const lastName = msg.from!.last_name;
   const chatType = msg.chat.type;
- const chatId = msg.chat.id;
+  const chatId = msg.chat.id;
 
 if (chatType === "group" || chatType === "supergroup") {
   bot.sendMessage(
@@ -27,16 +27,28 @@ if (chatType === "group" || chatType === "supergroup") {
       [userId, username, firstName, lastName]
     );
 
+    const profileUser = await getQuery(
+      "SELECT eos_account_name, eos_public_key, eos_private_key FROM users WHERE user_id = ?",
+      [userId]
+    );
+
+
     const { allowed, waitTime } = isAllowed(userId);
     if (allowed) {
       const eosPrice = await getEosPrice();
       const eosRamPrice = await getEosRamPrice();
       let welcomeMessage = `
-        EOS Bot: Your Gateway to EOS 🤖
+        *EOS Bot: Your Gateway to EOS* 🤖
 
 🔹 EOS: $${eosPrice}
 🔹 RAM: ${eosRamPrice} EOS/kb
-🔹 [TG Group](https://t.me/+FW4raomd1aY1YWI1) | [GitHub](https://github.com/pursonchen/eos-wallet-bot)`;
+🔹 [TG Group](https://t.me/+FW4raomd1aY1YWI1) | [GitHub](https://github.com/pursonchen/eos-wallet-bot)
+  
+`;
+if(!profileUser.eos_public_key && !profileUser.eos_private_key) 
+  { 
+    welcomeMessage +=  "Click _Wallet_ to Buy An EOS Account." 
+  }
 
       bot.sendMessage(chatId, welcomeMessage, {
         disable_web_page_preview: true,
