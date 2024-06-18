@@ -874,7 +874,7 @@ Enter Addresses with Amounts and memo(optional). The address and amount are sepa
 
     try {
       const result = await transferEos(userId, recipient, Number(amount), memo);
-      const transactionId = result.resolved?.transaction.id;
+      const transactionId = result.response?.transaction_id;
       const transactionLink = `https://bloks.io/transaction/${transactionId}`;
       bot.sendMessage(
         chatId,
@@ -961,7 +961,7 @@ export async function handleBuyRAM(callbackQuery: CallbackQuery) {
         const result = await buyRamBytes(userId, recipient, bytes);
         bot.sendMessage(
           chatId,
-          `RAM bought successfully!\nTransaction ID: https://bloks.io/transaction/${result.resolved?.transaction.id}`,
+          `RAM bought successfully!\nTransaction ID: https://bloks.io/transaction/${result.response?.transaction_id}`,
           {
             reply_markup: {
               inline_keyboard: [
@@ -975,7 +975,7 @@ export async function handleBuyRAM(callbackQuery: CallbackQuery) {
         const result = await buyRam(userId, recipient, eosAmount);
         bot.sendMessage(
           chatId,
-          `RAM bought successfully!\nTransaction ID: https://bloks.io/transaction/${result.resolved?.transaction.id}`,
+          `RAM bought successfully!\nTransaction ID: https://bloks.io/transaction/${result.response?.transaction_id}`,
           {
             reply_markup: {
               inline_keyboard: [
@@ -1286,7 +1286,7 @@ function passwordInvalidRetryCreateAccount(msg: Message, userId: number,  count:
       );
       bot.sendMessage(
         userId,
-        `Account create successfully!\nTransaction ID: https://bloks.io/transaction/${result.resolved?.transaction.id}`,
+        `Account create successfully!\nTransaction ID: https://bloks.io/transaction/${result.response?.transaction_id}`,
         {
           parse_mode: "HTML",
           reply_markup: {
@@ -1350,7 +1350,7 @@ export async function handlePaymentSuccess(payload: string) {
           );
           bot.sendMessage(
             userId,
-            `Account create successfully!\nTransaction ID: https://bloks.io/transaction/${result.resolved?.transaction.id}`,
+            `Account create successfully!\nTransaction ID: https://bloks.io/transaction/${result.response?.transaction_id}`,
             {
               parse_mode: "HTML",
               reply_markup: {
@@ -1510,7 +1510,7 @@ try {
           );
           bot.sendMessage(
             userId,
-            `Account create successfully!\nTransaction ID: https://bloks.io/transaction/${result.resolved?.transaction.id}`,
+            `Account create successfully!\nTransaction ID: https://bloks.io/transaction/${result.response?.transaction_id}`,
             {
               parse_mode: "HTML",
               reply_markup: {

@@ -38,7 +38,7 @@ app.post("/oxaPayCallback", async (req: Request, res: Response) => {
         userId: Number(userId),
       };
 
-      client.write(JSON.stringify(message));
+      client.write(JSON.stringify(message) + "\n");
     });
   } catch (error) {
     let failureReason = "Unknown error";
