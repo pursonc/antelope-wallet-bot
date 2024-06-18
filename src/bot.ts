@@ -197,9 +197,21 @@ export default bot;
 
 // Create a TCP server for RAM limit order & 0xapay callbacks
 const server = net.createServer((socket) => {
+    let buffer = '';
+    
   try {
     socket.on("data", async (data) => {
-      const message: RAMLimitOrderMessage = JSON.parse(data.toString());
+
+      buffer += data.toString();
+
+    let boundary;
+    while ((boundary = buffer.indexOf('\n')) !== -1) {
+      const input = buffer.substring(0, boundary);
+      buffer = buffer.substring(boundary + 1);
+      try {
+      const message = JSON.parse(input.toString());
+      console.log('Received:', message);
+        // const message: RAMLimitOrderMessage = JSON.parse(data.toString());
 
       if (message.type === "buyRamBytes") {
         const { userId, recipient, bytes, orderId } = message;
@@ -286,7 +298,9 @@ const server = net.createServer((socket) => {
             failureReason = error.message;
           }
         }
-      }
+      }} catch (error) {
+        console.error("Invalid JSON:", input);
+      }}
     });
   } catch (error) {
     let failureReason = "Unknown error";

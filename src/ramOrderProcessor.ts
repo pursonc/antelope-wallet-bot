@@ -16,7 +16,7 @@ async function processRamOrders() {
       if (message.type === "buyRamBytesResult") {
         console.log(`Received buyRamBytes result:`, message.result);
 
-        const transactionId = message.result.resolved?.transaction.id;
+        const transactionId = message.result.response?.transaction_id;
         await runQuery(
           "UPDATE ram_orders SET order_status = 'success', trigger_date = datetime('now'), transaction_id = ? WHERE order_id = ?",
           [transactionId, message.orderId]
@@ -46,7 +46,7 @@ async function processRamOrders() {
         orderId: order.order_id,
       };
 
-      client.write(JSON.stringify(message));
+      client.write(JSON.stringify(message) + "\n");
     }
   } catch (error) {
     console.error("Error checking RAM prices:", error);
