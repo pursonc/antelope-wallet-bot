@@ -1,7 +1,7 @@
-# TELEGRAM EOS WALLET BOT 🤖️
+# TELEGRAM Antelope WALLET BOT 🤖️
 ### The current private key encryption scheme is very weak and only suitable for small-capital testing. Welcome to submit PR.
 
-[Telegram Group](https://t.me/+FW4raomd1aY1YWI1) | [EOS WALLET BOT](https://t.me/eos_wallet_bot)
+[Telegram Group](https://t.me/+FW4raomd1aY1YWI1) | [Antelope WALLET BOT](https://t.me/Antelope_wallet_bot)
 
 ## Features
 ### Security Model
@@ -14,15 +14,15 @@
 ### Resource Sharing
 
 - Use the Wharf Resorce Provider
-- TODO: The author provides an EOS account to create new accounts and co-sign each transaction for the user, sharing CPU and NET resources.
-- TODO: When users operate the wallet to transfer funds, buy RAM, or purchase accounts, an action is taken to power up the author's EOS account. The more people use it, the more resources are available to the overall wallet users.
+- TODO: The author provides an Antelope account to create new accounts and co-sign each transaction for the user, sharing CPU and NET resources.
+- TODO: When users operate the wallet to transfer funds, buy RAM, or purchase accounts, an action is taken to power up the author's Antelope account. The more people use it, the more resources are available to the overall wallet users.
 
 ### Wallet Features
 
-- Provides options to purchase EOS accounts via credit card or cryptocurrency.
+- Provides options to purchase Antelope accounts via credit card or cryptocurrency.
 - Provides a RAM order book purchase function.
 
-https://github.com/pursonchen/eos-wallet-bot/assets/17820243/ad643fb9-7805-49ce-91a2-6185925d5484
+https://github.com/pursonchen/Antelope-wallet-bot/assets/17820243/ad643fb9-7805-49ce-91a2-6185925d5484
 
 
 ## Set UP
