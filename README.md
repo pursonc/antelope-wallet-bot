@@ -22,7 +22,7 @@
 - Provides options to purchase Antelope accounts via credit card or cryptocurrency.
 - Provides a RAM order book purchase function.
 
-https://github.com/pursonchen/Antelope-wallet-bot/assets/17820243/ad643fb9-7805-49ce-91a2-6185925d5484
+
 
 
 ## Set UP
@@ -71,7 +71,7 @@ TELEGRAM_BOT_TOKEN=your-telegram-bot-token
 
 more infomation about telegram payment : https://core.telegram.org/bots/payments
 
-![payment](images/payments.png)
+
 
 ```js
 // .env
